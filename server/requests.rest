@@ -1,0 +1,67 @@
+POST http://localhost:5000/api/auth/signup
+Content-Type: application/json
+
+{
+    "name": "Vedant",
+    "email": "vedantishere@gmail.com",
+    "password": "123456"
+}
+
+###
+
+POST http://localhost:5000/api/auth/login
+Content-Type: application/json
+
+{
+    "name": "Vedant",
+    "email": "vedantishere@gmail.com",
+    "password": "123456"
+}
+
+###
+
+GET http://localhost:5000/api/protected
+x-auth-token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoiNjg4Y2YyYjJjM2IwNGMxMDk5OTM1NDE0In0sImlhdCI6MTc1NTMzNDUyNSwiZXhwIjoxNzU1MzM4MTI1fQ.LEUp8rsfkiCThUVD2l7w72zeubFDfCnlIhwUoE7X_xU
+
+###
+
+GET http://localhost:5000/api/user/profile
+x-auth-token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoiNjg4Y2YyYjJjM2IwNGMxMDk5OTM1NDE0In0sImlhdCI6MTc1NTMzNjY1NywiZXhwIjoxNzU1MzQwMjU3fQ.UfyfIADRa-YIMV0BYhrOwS0vY066LWIf1aALGxPoIpk
+###
+
+POST http://localhost:5000/api/movies
+Content-Type: application/json
+x-auth-token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4OGNmMmIyYzNiMDRjMTA5OTkzNTQxNCIsImlhdCI6MTc1NTE3Mzc3NSwiZXhwIjoxNzU1Nzc4NTc1fQ.TEtHkF8Oj_rRTG9uJq58JO43CEcBpTyPyOhnAXAFwr0
+
+{
+    "title": "Intersteller",
+    "genre": "Sci-Fi",
+    "duration": 169
+}
+
+###
+
+GET http://localhost:5000/api/movies
+x-auth-token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoiNjg4Y2YyYjJjM2IwNGMxMDk5OTM1NDE0In0sImlhdCI6MTc1NTMzNjY1NywiZXhwIjoxNzU1MzQwMjU3fQ.UfyfIADRa-YIMV0BYhrOwS0vY066LWIf1aALGxPoIpk
+### 
+
+DELETE http://localhost:5000/api/movies/6896288cae46e8a5b48711c1
+x-auth-token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoiNjg4Y2YyYjJjM2IwNGMxMDk5OTM1NDE0In0sImlhdCI6MTc1NTMzNDUyNSwiZXhwIjoxNzU1MzM4MTI1fQ.LEUp8rsfkiCThUVD2l7w72zeubFDfCnlIhwUoE7X_xU
+
+###
+
+PUT http://localhost:5000/api/movies/688f57f0b362c5af9389dac2
+x-auth-token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4OGNmMmIyYzNiMDRjMTA5OTkzNTQxNCIsImlhdCI6MTc1NDIyMTEzMywiZXhwIjoxNzU0ODI1OTMzfQ.0WMU_gUrMtzg1CE3Hp1FrHE9Z5M4KJ7sYcApCrzVloI
+Content-Type: application/json
+
+{
+    "rating": 9,
+    "status": "completed",
+    "genre": "Sci-Fi",
+    "duration": 165
+}
+
+###
+
+GET http://localhost:5000/api/movies/stats
+x-auth-token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4OGNmMmIyYzNiMDRjMTA5OTkzNTQxNCIsImlhdCI6MTc1NDIyMTEzMywiZXhwIjoxNzU0ODI1OTMzfQ.0WMU_gUrMtzg1CE3Hp1FrHE9Z5M4KJ7sYcApCrzVloI

@@ -1,0 +1,121 @@
+/* src/styles/search.css */
+
+/* Search Bar Container */
+.search-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 20px auto;
+  max-width: 600px;
+  width: 90%;
+  background-color: #1c1c1c;
+  border-radius: 5px;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+/* Search Input */
+.search-bar input {
+  flex: 1;
+  padding: 12px 18px;
+  font-size: 16px;
+  color: #fff;
+  background: transparent;
+  border: none;
+  outline: none;
+}
+
+.search-bar input::placeholder {
+  color: #aaa;
+}
+
+/* Search Button */
+.search-bar button {
+  padding: 12px 20px;
+  background: #e50914;
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  border: none;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.search-bar button:hover {
+  background: #f40612;
+}
+
+
+.search-results {
+  padding: 20px;
+  color: #fff;
+  background: linear-gradient(to bottom right, #000, #111, #1a1a1a);
+  min-height: 100vh;
+}
+
+.search-results h2 {
+  font-size: 1.8rem;
+  margin-bottom: 20px;
+  font-weight: bold;
+  text-align: center;
+}
+
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1.2rem;
+}
+
+.result-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  overflow: hidden;
+  text-align: center;
+  padding-bottom: 10px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+}
+
+.result-card img {
+  width: 100%;
+  height: 225px;
+  object-fit: cover;
+  display: block;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.result-card p {
+  margin-top: 10px;
+  font-weight: 500;
+  font-size: 0.95rem;
+  padding: 0 5px;
+}
+
+.result-card .type-tag {
+  display: inline-block;
+  background: #ff4757;
+  color: #fff;
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 8px;
+  margin-top: 5px;
+}
+
+.result-card .rating {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: #ffdd59;
+}
+
+.result-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0px 8px 20px rgba(255, 255, 255, 0.1);
+}
+
+/* Mobile tweaks */
+@media (max-width: 600px) {
+  .results-grid {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
+}

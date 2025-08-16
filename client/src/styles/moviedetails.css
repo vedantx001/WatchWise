@@ -1,0 +1,67 @@
+/* Styling for the backdrop image and gradient overlay */
+.backdrop-container {
+    position: relative;
+    background-size: cover;
+    background-position: center;
+    color: white;
+}
+
+.backdrop-overlay {
+    /* Creates a dark gradient from bottom to top for text readability */
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 25%, rgba(0, 0, 0, 0.5) 100%);
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
+/* Glassmorphism effect for the main content card */
+.glass-card {
+    /* Fallback for browsers that don't support backdrop-filter */
+    background-color: rgba(26, 26, 26, 0.6); 
+    /* The magic */
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px); 
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Animated progress circle for rating */
+.rating-circle {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background-color: rgba(0,0,0,0.7);
+    cursor: pointer;
+}
+
+.rating-circle svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform: rotate(-90deg); /* Start the circle from the top */
+}
+
+.rating-circle circle {
+    fill: none;
+    stroke-width: 5;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1.5s ease-out; /* Animation */
+}
+
+.rating-circle .circle-bg {
+    stroke: rgba(255, 255, 255, 0.2); /* The background track of the circle */
+}
+
+.rating-circle .circle-progress {
+    stroke: #e50914; /* The active progress color (Netflix Red) */
+}
+
+.rating-text {
+    font-size: 1.1rem;
+    font-weight: bold;
+}
