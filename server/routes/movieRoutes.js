@@ -92,7 +92,7 @@ router.put(
     if (title) updatedFields.title = title;
     // Handle genre update to ensure it remains an array
     if (genre !== undefined) {
-        updatedFields.genre = Array.isArray(genre) ? genre : (genre ? genre.split(',').map(g => g.trim()) : []);
+      updatedFields.genre = Array.isArray(genre) ? genre : (genre ? genre.split(',').map(g => g.trim()) : []);
     }
     if (duration !== undefined) updatedFields.duration = duration;
     if (status) updatedFields.status = status;
@@ -180,6 +180,27 @@ router.get("/", auth, async (req, res) => {
   }
 });
 
+// @route DELETE api/movies/clear
+// @desc Delete every movie or tv from watchlist
+// @access Private 
+
+router.delete("/clear", auth, async (req, res) => {
+  try {
+    // Only delete movies belonging to the logged-in user
+    const result = await Movie.deleteMany({ user: req.user.id });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ msg: "No movies/TV shows to delete in your watchlist" });
+    }
+
+    res.json({ msg: "All movies/TV shows removed from your watchlist" });
+  }
+  catch {
+    console.error(err.message);
+    res.status(500).send("Server error");
+  }
+});
+
 // @route   DELETE api/movies/:id
 // @desc    Delete a movie/tv show from watchlist
 // @access  Private
@@ -207,6 +228,7 @@ router.delete("/:id", auth, async (req, res) => {
     res.status(500).send("Server error");
   }
 });
+
 
 // @route   GET api/movies/stats
 // @desc    Get comprehensive watchlist statistics for a user, with filters
