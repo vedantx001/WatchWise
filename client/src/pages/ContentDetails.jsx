@@ -114,7 +114,7 @@ export default function ContentDetails() {
                     posterPath: content.poster_path
                         ? `https://image.tmdb.org/t/p/w500${content.poster_path}`
                         : fallbackPoster,
-                    tmdbId: content.id, // Important for uniqueness and linking back to TMDB
+                    tmdbId: String(content.id), // Important for uniqueness and linking back to TMDB
                     contentType: type, // Store content type (movie/tv) for backend processing
                 },
                 {

@@ -1,12 +1,10 @@
 const router = require("express").Router();
 const Movie = require("../models/Movie");
 const auth = require("../middleware/auth");
-const { check, validationResult } = require("express-validator"); // New import
-const mongoose = require('mongoose'); // New import for ObjectId
+const { check, validationResult } = require("express-validator");
+const mongoose = require('mongoose');
 
-// @route   POST api/movies
-// @desc    Add a movie/tv show to watchlist
-// @access  Private
+
 router.post(
   "/",
   auth,
@@ -14,18 +12,22 @@ router.post(
     // Validation for new movie/tv show
     check("title", "Title is required").not().isEmpty(),
     check("duration", "Duration must be a number").optional().isNumeric(),
-    check("rating", "Rating must be between 0 and 10").optional().isInt({ min: 0, max: 10 }),
+    check("rating", "Rating must be between 0 and 10").optional().isFloat({ min: 0, max: 10 }),
     check("status", "Invalid status").optional().isIn(["planned", "watching", "completed"]),
     check("contentType", "Content type must be 'movie' or 'tv'").optional().isIn(["movie", "tv"]),
     // If tmdbId is provided, it must be a string and contentType must also be present
-    check("tmdbId", "TMDB ID is required for TMDB content").optional().isString().if(check("contentType").exists()),
-    check("contentType", "Content type is required if TMDB ID is provided").optional().isString().if(check("tmdbId").exists()),
+    check("tmdbId", "TMDB ID is required for TMDB content").optional().isString().if((value, { req }) => !!req.body.contentType),
+    check("contentType", "Content type is required if TMDB ID is provided").optional().isString().if((value, { req }) => !!req.body.tmdbId),
   ],
   async (req, res) => {
+    console.log("REQ BODY:", req.body);
+    console.log("USER:", req.user);
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log("Validation errors:", errors.array());
       return res.status(400).json({ errors: errors.array() });
     }
+
 
     const { title, genre, duration, status, rating, posterPath, tmdbId, contentType } = req.body;
 
@@ -57,6 +59,7 @@ router.post(
       });
 
       const movie = await newMovie.save();
+      console.log(movie);
       res.json(movie);
     } catch (err) {
       console.error(err.message);
@@ -65,9 +68,6 @@ router.post(
   }
 );
 
-// @route   PUT api/movies/:id
-// @desc    Update a movie/tv show in watchlist
-// @access  Private
 router.put(
   "/:id",
   auth,
@@ -75,7 +75,7 @@ router.put(
     // Validation for update
     check("title", "Title cannot be empty").optional().not().isEmpty(),
     check("duration", "Duration must be a number").optional().isNumeric(),
-    check("rating", "Rating must be between 0 and 10").optional().isInt({ min: 0, max: 10 }),
+    check("rating", "Rating must be between 0 and 10").optional().isFloat({ min: 0, max: 10 }),
     check("status", "Invalid status").optional().isIn(["planned", "watching", "completed"]),
     check("favorite", "Favorite must be a boolean").optional().isBoolean(),
     // No need to validate tmdbId/contentType on update as they should be immutable
@@ -209,70 +209,76 @@ router.delete("/:id", auth, async (req, res) => {
 });
 
 // @route   GET api/movies/stats
-// @desc    Get watchlist statistics for a user
+// @desc    Get watchlist statistics for a user (with best/worst titles)
 // @access  Private
 router.get("/stats", auth, async (req, res) => {
-    try {
-        // Ensure the user ID is a valid ObjectId for aggregation
-        const userId = new mongoose.Types.ObjectId(req.user.id);
+  try {
+    const userId = new mongoose.Types.ObjectId(req.user.id);
 
-        const stats = await Movie.aggregate([
-            { $match: { user: userId } },
-            {
-                $group: {
-                    _id: null,
-                    totalMovies: { $sum: 1 },
-                    completedCount: {
-                        $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] },
-                    },
-                    totalDuration: { $sum: "$duration" }, // sum up duration
-                    avgRating: { $avg: "$rating" },
-                    highestRating: { $max: "$rating" },
-                    lowestRating: { $min: "$rating" },
-                    // For best/worst movie, we'll get an array and then pick the first one
-                    bestMovieTitles: {
-                        $push: {
-                            $cond: [{ $eq: ["$rating", "$$ROOT.highestRating"] }, "$title", "$$REMOVE"],
-                        },
-                    },
-                    worstMovieTitles: {
-                        $push: {
-                            $cond: [{ $eq: ["$rating", "$$ROOT.lowestRating"] }, "$title", "$$REMOVE"],
-                        },
-                    },
-                },
-            },
-            {
-                $project: {
-                    _id: 0,
-                    totalMovies: 1,
-                    completedCount: 1,
-                    totalHours: { $round: [{ $divide: ["$totalDuration", 60] }, 1] }, // Convert minutes to hours, 1 decimal place
-                    avgRating: { $round: ["$avgRating", 1] },
-                    // Use $arrayElemAt to pick the first title if multiple movies share the same best/worst rating
-                    best: { $arrayElemAt: ["$bestMovieTitles", 0] },
-                    worst: { $arrayElemAt: ["$worstMovieTitles", 0] },
-                },
-            },
-        ]);
+    // 1) Summary stats
+    const summary = await Movie.aggregate([
+      { $match: { user: userId } },
+      {
+        $group: {
+          _id: null,
+          totalMovies: { $sum: 1 },
+          completedCount: {
+            $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] },
+          },
+          totalDuration: { $sum: "$duration" },
+          avgRating: { $avg: "$rating" },
+          highestRating: { $max: "$rating" },
+          lowestRating: { $min: "$rating" },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          totalMovies: 1,
+          completedCount: 1,
+          totalHours: { $round: [{ $divide: ["$totalDuration", 60] }, 1] },
+          avgRating: { $round: ["$avgRating", 1] },
+          highestRating: 1,
+          lowestRating: 1,
+        },
+      },
+    ]);
 
-        // Handle case where no movies exist for the user
-        if (stats.length === 0) {
-            return res.json({
-                totalMovies: 0,
-                completedCount: 0,
-                totalHours: 0,
-                avgRating: 0,
-                best: "N/A",
-                worst: "N/A",
-            });
-        }
-
-        res.json(stats[0]);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send("Server error");
+    // If no movies
+    if (summary.length === 0) {
+      return res.json({
+        totalMovies: 0,
+        completedCount: 0,
+        totalHours: 0,
+        avgRating: 0,
+        highestRating: 0,
+        lowestRating: 0,
+        best: "N/A",
+        worst: "N/A",
+      });
     }
+
+    // 2) Best movie (highest rating)
+    const best = await Movie.findOne({ user: req.user.id })
+      .sort({ rating: -1 })
+      .select("title rating -_id");
+
+    // 3) Worst movie (lowest rating)
+    const worst = await Movie.findOne({ user: req.user.id })
+      .sort({ rating: 1 })
+      .select("title rating -_id");
+
+    // Final response
+    res.json({
+      ...summary[0],
+      best: best ? best.title : "N/A",
+      worst: worst ? worst.title : "N/A",
+    });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
+  }
 });
+
 
 module.exports = router;
