@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../api";
+import SearchBar from "../components/SearchBar";
 
 function Watchlist() {
   const [movies, setMovies] = useState([]);
@@ -8,129 +9,162 @@ function Watchlist() {
   const [duration, setDuration] = useState("");
   const [filter, setFilter] = useState("all");
 
-
   useEffect(() => {
+    // Fetches movies from the API when the component mounts
     api.get("/movies").then((res) => setMovies(res.data));
   }, []);
 
   const addMovie = async (e) => {
     e.preventDefault();
-    const res = await api.post("/movies", { title, genre, duration });
+    // Adds a new movie to the watchlist via API
+    const res = await api.post("/movies", { title, genre, duration: Number(duration) }); // Ensure duration is a number
     setMovies([res.data, ...movies]);
+    // Clears input fields after adding
     setTitle("");
     setGenre("");
     setDuration("");
   };
 
   const markCompleted = async (id) => {
+    // Updates movie status to 'completed'
     const res = await api.put(`/movies/${id}`, { status: "completed" });
     setMovies(movies.map((m) => (m._id === id ? res.data : m)));
   };
 
+  // Filters movies based on the selected status
   const filteredMovies = movies.filter((m) =>
     filter === "all" ? true : m.status === filter
   );
 
   const rateMovie = async (id, newRating) => {
-    const res = await api.put(`/movies/${id}`, { rating: newRating });
+    // Updates the rating of a movie
+    const res = await api.put(`/movies/${id}`, { rating: Number(newRating) }); // Ensure rating is a number
     setMovies(movies.map((m) => (m._id === id ? res.data : m)));
   };
 
   const deleteMovie = async (id) => {
+    // Deletes a movie from the watchlist
     await api.delete(`/movies/${id}`);
     setMovies(movies.filter((m) => m._id !== id));
   };
 
   const toggleFavorite = async (id) => {
+    // Toggles the favorite status of a movie
     const res = await api.put(`/movies/${id}/favorite`);
     setMovies(movies.map((m) => (m._id === id ? res.data : m)));
-    console.log("clicked");
   };
 
+  // Identifies and sorts the top 5 trending movies (rating >= 8)
   const trendingMovies = [...movies]
-  .filter((m) => m.rating >= 8)
-  .sort((a, b) => b.rating - a.rating)
-  .slice(0, 5);
+    .filter((m) => m.rating >= 8)
+    .sort((a, b) => b.rating - a.rating)
+    .slice(0, 5);
 
   return (
-    <div className="p-8 text-white">
-      <h2 className="text-2xl mb-4">🎬 Your Watchlist</h2>
-      {/* Form to Add movie*/}
-      <form onSubmit={addMovie} className="flex gap-2 mb-6">
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" className="p-2 text-red" />
-        <input value={genre} onChange={(e) => setGenre(e.target.value)} placeholder="Genre" className="p-2 text-red" />
-        <input value={duration} type="number" onChange={(e) => setDuration(e.target.value)} placeholder="Duration(min)" className="p-2 text-red w-32" />
-        <button className="bg-red-600 px-4 py-2 rounded">Add</button>
-      </form>
+    <div className="min-h-screen bg-gray-900 text-gray-100 p-6 sm:p-10">
+      <h2 className="text-4xl font-extrabold text-center mb-10 text-red-500 animate-fade-in-down">
+        🎬 Your Watchlist
+      </h2>
 
-      {/* Filter Buttons*/}
-      <div className="flex gap-4 mb-4">
+      {/* Add movies */}
+      <div className="m-auto w-full max-w-md">
+          <SearchBar />
+      </div>
+
+      {/* Filter Buttons */}
+      <div className="flex justify-center flex-wrap gap-3 mb-8">
         {["all", "planned", "watching", "completed"].map((f) => (
-        <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1 rounded ${filter === f ? "bg-red-600" : "bg-gray-700"}`}>
-          {f}
-        </button>
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`px-5 py-2 rounded-full font-semibold transition duration-300 ease-in-out ${
+              filter === f
+                ? "bg-red-600 text-white shadow-lg"
+                : "bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white"
+            }`}
+          >
+            {f.charAt(0).toUpperCase() + f.slice(1)}
+          </button>
         ))}
       </div>
 
-      {/* Movie List*/}
-      <ul>
-        {filteredMovies.map((m) => (
-          <li key={m._id} className="border-b py-2 flex justify-between items-center">
-            <div>
-              <div className="h-32 bg-gray-700 flex items-center justify-center text-xl">🎬</div>
-              <h3 className="font-bold mt-2">
-                <button onClick={() => toggleFavorite(m._id)} className={`${m.favorite ? "text-yellow-400" : "text-white-400"} cursor-pointer`}>
+      <hr className="border-gray-700 my-8" />
+
+      {/* Movie List */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {filteredMovies.length > 0 ? (
+          filteredMovies.map((m) => (
+            <div
+              key={m._id}
+              className="bg-gray-800 rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden flex flex-col"
+            >
+              <div className="relative h-48 bg-gray-700 flex items-center justify-center text-5xl text-gray-400 border-b border-gray-700">
+                🎬
+                <button
+                  onClick={() => toggleFavorite(m._id)}
+                  className={`absolute top-3 right-3 text-4xl leading-none ${
+                    m.favorite ? "text-yellow-400" : "text-gray-400 hover:text-yellow-300"
+                  } transition-colors duration-200`}
+                  title={m.favorite ? "Unfavorite" : "Favorite"}
+                >
                   ⭐
                 </button>
-                {m.title}
-              </h3>
-              <p className="text-sm text-gray-400">{m.genre || "Unknown"} • {m.duration} min</p>
-              <p className="text-xs text-gray-500">Status: {m.status}</p>
-    
-              {/* Rating Input */}
-              <div className="mt-1">
-                <input
-                  type="number"
-                  min="0"
-                  max="10"
-                  value={m.rating}
-                  onChange={(e) => rateMovie(m._id, e.target.value)}
-                  className="w-16 text-center rounded text-red"
-                />{" "}
-              <span className="text-sm text-gray-400">/10</span>
+              </div>
+              <div className="p-5 flex-grow flex flex-col">
+                <h3 className="text-2xl font-bold mb-2 text-white">
+                  {m.title}
+                </h3>
+                <p className="text-sm text-gray-400 mb-2">
+                  {m.genre || "Unknown Genre"} • {m.duration || "N/A"} min
+                </p>
+                <p className={`text-xs font-semibold px-2 py-1 rounded-full w-fit mb-3
+                  ${m.status === "completed" ? "bg-green-600" : ""}
+                  ${m.status === "watching" ? "bg-blue-600" : ""}
+                  ${m.status === "planned" ? "bg-purple-600" : ""}`}
+                >
+                  Status: {m.status.charAt(0).toUpperCase() + m.status.slice(1)}
+                </p>
+
+                {/* Rating Input */}
+                <div className="mt-auto flex items-center gap-2 pt-3 border-t border-gray-700">
+                  <span className="text-gray-400 text-sm">Your Rating:</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="10"
+                    value={m.rating !== undefined ? m.rating : ""}
+                    onChange={(e) => rateMovie(m._id, e.target.value)}
+                    className="w-20 text-center rounded-md bg-gray-700 text-white p-1 focus:outline-none focus:ring-1 focus:ring-red-500"
+                    placeholder="Rate"
+                  />
+                  <span className="text-md text-gray-400">/10</span>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 p-5 bg-gray-700 border-t border-gray-600">
+                {m.status !== "completed" && (
+                  <button
+                    onClick={() => markCompleted(m._id)}
+                    className="text-green-400 hover:text-green-300 font-medium text-sm transition-colors duration-200"
+                  >
+                    Mark Completed
+                  </button>
+                )}
+                <button
+                  onClick={() => deleteMovie(m._id)}
+                  className="text-red-400 hover:text-red-300 font-medium text-sm transition-colors duration-200"
+                >
+                  Delete
+                </button>
               </div>
             </div>
-
-            <div className="flex gap-2">
-              {m.status !== "completed" && (
-                <button
-                  onClick={() => markCompleted(m._id)}
-                  className="text-green-400 hover:text-green-600 text-sm"
-                >
-                  Mark Completed
-                </button>
-              )}
-              <button
-                onClick={() => deleteMovie(m._id)}
-                className="text-red-400 hover:text-red-600 text-sm"
-              >
-                Delete
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
-      <div className="mt-8">
-        <h3 className="text-xl mb-4">🔥 Trending Movies (Your Top 5)</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-          {trendingMovies.map((m) => (
-            <div key={m._id} className="bg-gray-800 p-3 rounded">
-              <h4 className="font-bold">{m.title}</h4>
-              <p>⭐ {m.rating}</p>
-            </div>
-          ))}
-        </div>
+          ))
+        ) : (
+          <p className="col-span-full text-center text-gray-500 text-xl py-10">No movies to display in this filter. Add some! 🚀</p>
+        )}
       </div>
+
+      <hr className="border-gray-700 my-12" />
+
     </div>
   );
 }
