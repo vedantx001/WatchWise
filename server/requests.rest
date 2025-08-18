@@ -47,7 +47,7 @@ x-auth-token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoiNjg4Y2YyY
 ###
 
 GET http://localhost:5000/api/movies
-x-auth-token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoiNjg4Y2YyYjJjM2IwNGMxMDk5OTM1NDE0In0sImlhdCI6MTc1NTQ0NTQ1OCwiZXhwIjoxNzU1NDQ5MDU4fQ.Q0dmwsF3ZUuiLFI8t1vO4wRniFefa7cEdV_EWKC0H6w
+x-auth-token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoiNjg4Y2YyYjJjM2IwNGMxMDk5OTM1NDE0In0sImlhdCI6MTc1NTUyMDY0MSwiZXhwIjoxNzU1NTI0MjQxfQ.DKqkliFi1FgJMTF-kvUkFoQJ3ccYzUC_W897L08n3Es
 
 ### 
 
@@ -56,12 +56,12 @@ x-auth-token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoiNjg4Y2YyY
 
 ###
 
-PUT http://localhost:5000/api/movies/689320f8ffd5feda2493cd2b
-x-auth-token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoiNjg4Y2YyYjJjM2IwNGMxMDk5OTM1NDE0In0sImlhdCI6MTc1NTQ0NTQ1OCwiZXhwIjoxNzU1NDQ5MDU4fQ.Q0dmwsF3ZUuiLFI8t1vO4wRniFefa7cEdV_EWKC0H6w
+PUT http://localhost:5000/api/movies/6890677838d4ca8474adac1d
+x-auth-token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoiNjg4Y2YyYjJjM2IwNGMxMDk5OTM1NDE0In0sImlhdCI6MTc1NTUxMTc2MCwiZXhwIjoxNzU1NTE1MzYwfQ.ba5ark7m9vMRRP0LD3or7jaN8KGlsmmpp7qzmfYM5cE
 Content-Type: application/json
 
 {
-    "rating": 9.1
+    "contentType": "movie"
 }
 
 ###

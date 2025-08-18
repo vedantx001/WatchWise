@@ -1,0 +1,30 @@
+/* Dashboard.css */
+
+/* Custom styles for Recharts Tooltip */
+.recharts-tooltip-wrapper {
+  outline: none;
+}
+
+/* Style for the chart's y-axis labels */
+.recharts-yAxis .recharts-text {
+  font-weight: 600;
+  fill: #d1d5db; /* gray-300 */
+}
+
+/* Custom scrollbar for better aesthetics on longer pages */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1f2937; /* gray-800 */
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4b5563; /* gray-600 */
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6b7280; /* gray-500 */
+}

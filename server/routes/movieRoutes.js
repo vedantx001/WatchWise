@@ -209,76 +209,325 @@ router.delete("/:id", auth, async (req, res) => {
 });
 
 // @route   GET api/movies/stats
-// @desc    Get watchlist statistics for a user (with best/worst titles)
+// @desc    Get comprehensive watchlist statistics for a user, with filters
 // @access  Private
+// @params  contentType (optional): 'movie' or 'tv'. Defaults to all.
+// @params  timeFilter (optional): 'overall', 'year', 'month'. Defaults to 'overall'.
 router.get("/stats", auth, async (req, res) => {
-  try {
-    const userId = new mongoose.Types.ObjectId(req.user.id);
+    try {
+        const userId = new mongoose.Types.ObjectId(req.user.id);
+        const { contentType, timeFilter } = req.query; // Get filters from query parameters
 
-    // 1) Summary stats
-    const summary = await Movie.aggregate([
-      { $match: { user: userId } },
-      {
-        $group: {
-          _id: null,
-          totalMovies: { $sum: 1 },
-          completedCount: {
-            $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] },
-          },
-          totalDuration: { $sum: "$duration" },
-          avgRating: { $avg: "$rating" },
-          highestRating: { $max: "$rating" },
-          lowestRating: { $min: "$rating" },
-        },
-      },
-      {
-        $project: {
-          _id: 0,
-          totalMovies: 1,
-          completedCount: 1,
-          totalHours: { $round: [{ $divide: ["$totalDuration", 60] }, 1] },
-          avgRating: { $round: ["$avgRating", 1] },
-          highestRating: 1,
-          lowestRating: 1,
-        },
-      },
-    ]);
+        let matchStage = { user: userId }; // Start with user filter
 
-    // If no movies
-    if (summary.length === 0) {
-      return res.json({
-        totalMovies: 0,
-        completedCount: 0,
-        totalHours: 0,
-        avgRating: 0,
-        highestRating: 0,
-        lowestRating: 0,
-        best: "N/A",
-        worst: "N/A",
-      });
+        // Add content type filter if provided
+        if (contentType && (contentType === 'movie' || contentType === 'tv')) {
+            matchStage.contentType = contentType;
+        }
+
+        // Define time-based filtering for relevant stats (e.g., completed items)
+        let completedDateMatch = {};
+        if (timeFilter && timeFilter !== 'overall') {
+            const now = new Date();
+            let pastDate = new Date();
+
+            if (timeFilter === 'year') {
+                pastDate.setFullYear(now.getFullYear() - 1); // Last 365 days
+            } else if (timeFilter === 'month') {
+                pastDate.setMonth(now.getMonth() - 1); // Last 30 days
+            }
+            completedDateMatch = { completedDate: { $gte: pastDate.toISOString() } };
+        }
+
+        // --- Aggregation Pipeline ---
+        const aggregationPipeline = [
+            // Stage 1: Initial filter by user and content type
+            { $match: matchStage },
+            // Stage 2: Separate completed items by time filter for specific stats, and add dayOfWeek
+            {
+                $addFields: {
+                    isCompletedFiltered: {
+                        $and: [
+                            { $eq: ["$status", "completed"] },
+                            { $ne: ["$completedDate", null] },
+                            Object.keys(completedDateMatch).length > 0 ? { $gte: ["$completedDate", completedDateMatch.completedDate.$gte] } : { $literal: true }
+                        ]
+                    },
+                    dayOfWeek: {
+                        $cond: {
+                            if: { $and: [{ $ne: ["$completedDate", null] }, { $eq: ["$status", "completed"] }] },
+                            then: { $dayOfWeek: { $toDate: "$completedDate" } }, // 1 (Sunday) to 7 (Saturday)
+                            else: null
+                        }
+                    }
+                }
+            },
+            // Stage 3: Group all documents to calculate overall stats and collect necessary data
+            {
+                $group: {
+                    _id: null, // Group all into a single document
+                    totalItems: { $sum: 1 }, // Count all items (movies + tv shows)
+                    completedCount: {
+                        $sum: { $cond: ["$isCompletedFiltered", 1, 0] }
+                    },
+                    totalDurationMinutes: {
+                        $sum: { $cond: ["$isCompletedFiltered", "$duration", 0] }
+                    },
+                    avgRating: { $avg: "$rating" },
+                    highestRating: { $max: "$rating" },
+                    lowestRating: { $min: "$rating" },
+
+                    // Collect all items for secondary calculations (best/worst, top rated)
+                    allItems: { $push: "$$ROOT" },
+
+                    // Collect genres from *completed and filtered* items for favorite genre calculation
+                    allCompletedAndFilteredGenres: {
+                        $push: {
+                            $cond: ["$isCompletedFiltered", "$genre", "$$REMOVE"]
+                        }
+                    },
+                    // Collect durations for daily activity (pre-filtered)
+                    dailyActivityData: {
+                        $push: {
+                            $cond: [
+                            "$isCompletedFiltered",
+                            {
+                                day: "$dayOfWeek",
+                                count: 1 // both movie and tv = +1
+                            },
+                            "$$REMOVE"
+                            ]
+                        }
+                    }
+                },
+            },
+            // Stage 4: Post-processing for best/worst titles, favorite genre, top rated, and daily activity
+            {
+                $addFields: {
+                    // Best/Worst Rated Titles: Filter allItems
+                    bestRatedTitle: {
+                        $arrayElemAt: [
+                            {
+                                $map: {
+                                    input: {
+                                        $filter: {
+                                            input: "$allItems",
+                                            as: "item",
+                                            cond: { $eq: ["$$item.rating", "$highestRating"] }
+                                        }
+                                    },
+                                    as: "bestItem",
+                                    in: "$$bestItem.title"
+                                }
+                            }, 0
+                        ]
+                    },
+                    worstRatedTitle: {
+                        $arrayElemAt: [
+                            {
+                                $map: {
+                                    input: {
+                                        $filter: {
+                                            input: "$allItems",
+                                            as: "item",
+                                            cond: { $eq: ["$$item.rating", "$lowestRating"] }
+                                        }
+                                    },
+                                    as: "worstItem",
+                                    in: "$$worstItem.title"
+                                }
+                            }, 0
+                        ]
+                    },
+
+                    // Favorite Genre Calculation - REVISED
+                    favoriteGenre: {
+                        $cond: [
+                            { $eq: [{ $size: "$allCompletedAndFilteredGenres" }, 0] },
+                            "N/A",
+                            {
+                                $let: {
+                                    vars: {
+                                        // Flatten the array of arrays of genres
+                                        flattenedGenres: {
+                                            $reduce: {
+                                                input: "$allCompletedAndFilteredGenres",
+                                                initialValue: [],
+                                                in: { $concatArrays: ["$$value", "$$this"] }
+                                            }
+                                        }
+                                    },
+                                    in: {
+                                        $let: {
+                                            vars: {
+                                                // Count genre occurrences and create an array of { k: genreName, v: count }
+                                                genreCountsArray: {
+                                                    $map: {
+                                                        input: { $setUnion: "$$flattenedGenres" }, // Get unique genres
+                                                        as: "g",
+                                                        in: {
+                                                            k: "$$g",
+                                                            v: {
+                                                                $size: {
+                                                                    $filter: {
+                                                                        input: "$$flattenedGenres",
+                                                                        as: "fg",
+                                                                        cond: { $eq: ["$$fg", "$$g"] }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            in: {
+                                                // Find the genre with the maximum count
+                                                $arrayElemAt: [
+                                                    "$$genreCountsArray",
+                                                    {
+                                                        $indexOfArray: [
+                                                            { $map: { input: "$$genreCountsArray", as: "gc", in: "$$gc.v" } },
+                                                            { $max: { $map: { input: "$$genreCountsArray", as: "gc", in: "$$gc.v" } } }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    },
+
+                    // Top Rated Items: Filter and sort allItems
+                    topRatedItems: {
+                        $slice: [
+                            {
+                                $sortArray: {
+                                    input: {
+                                        $filter: {
+                                            input: "$allItems",
+                                            as: "item",
+                                            cond: { $gt: ["$$item.rating", 0] } // Only consider rated items
+                                        }
+                                    },
+                                    sortBy: { rating: -1 }
+                                }
+                            },
+                            10 // Get top 10
+                        ]
+                    },
+
+                    // Daily Activity:
+                    dailyActivity: {
+                        $let: {
+                            vars: {
+                                weekdayNames: ["", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+                            },
+                            in: {
+                                $map: {
+                                    input: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+                                    as: "dayName",
+                                    in: {
+                                        day: "$$dayName",
+                                        count: {
+                                            $sum: {
+                                                $map: {
+                                                    input: {
+                                                        $filter: {
+                                                            input: "$dailyActivityData",
+                                                            as: "item",
+                                                            cond: { $eq: [{ $arrayElemAt: ["$$weekdayNames", "$$item.day"] }, "$$dayName"] }
+                                                        }
+                                                    },
+                                                    as: "filteredItem",
+                                                    in: "$$filteredItem.count"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            // Stage 5: Project the final output structure
+            {
+                $project: {
+                    _id: 0,
+                    totalItems: 1,
+                    completedCount: 1,
+                    totalHours: { $round: [{ $divide: ["$totalDurationMinutes", 60] }, 1] },
+                    avgRating: { $round: ["$avgRating", 1] },
+                    highestRating: {
+                        $cond: [
+                            { $eq: ["$highestRating", null] }, // if no rating at all
+                            null,
+                            { $round: ["$highestRating", 1] } // otherwise round it
+                        ]
+                        },
+                    lowestRating: {
+                        $cond: [
+                            { $eq: ["$lowestRating", null] }, // if no rating at all
+                            null,
+                            { $round: ["$lowestRating", 1] } // otherwise round it (can be 0 if real)
+                        ]
+                    },
+                    best: "$bestRatedTitle",
+                    worst: "$worstRatedTitle",
+                    favoriteGenre: {
+                        $cond: [
+                            { $eq: ["$favoriteGenre", "N/A"] },
+                            "N/A",
+                            "$favoriteGenre.k"
+                        ]
+                    },
+                    topRated: {
+                        $map: { // Project only necessary fields for topRated items
+                            input: "$topRatedItems",
+                            as: "item",
+                            in: {
+                                _id: "$$item._id",
+                                title: "$$item.title",
+                                rating: "$$item.rating",
+                                contentType: "$$item.contentType",
+                                tmdbId: "$$item.tmdbId" // Ensure tmdbId is passed for frontend Link
+                            }
+                        }
+                    },  
+                    dailyActivity: 1
+                }
+            }
+        ];
+
+        const statsResult = await Movie.aggregate(aggregationPipeline);
+
+        if (statsResult.length === 0 || statsResult[0].totalItems === 0) {
+            // Return default zero stats if no items match the filters
+            return res.json({
+                totalItems: 0,
+                completedCount: 0,
+                totalHours: 0,
+                avgRating: 0,
+                highestRating: 0,
+                lowestRating: 0,
+                best: "N/A",
+                worst: "N/A",
+                favoriteGenre: "N/A",
+                topRated: [],
+                dailyActivity: [
+                    { day: "Mon", count: 0 }, { day: "Tue", count: 0 }, { day: "Wed", count: 0 },
+                    { day: "Thu", count: 0 }, { day: "Fri", count: 0 }, { day: "Sat", count: 0 }, { day: "Sun", count: 0 }
+                ]
+            });
+        }
+
+        res.json(statsResult[0]); // Send the first (and only) result document
+    } catch (err) {
+        console.error("Dashboard Stats Error:", err.message);
+        res.status(500).send("Server error");
     }
-
-    // 2) Best movie (highest rating)
-    const best = await Movie.findOne({ user: req.user.id })
-      .sort({ rating: -1 })
-      .select("title rating -_id");
-
-    // 3) Worst movie (lowest rating)
-    const worst = await Movie.findOne({ user: req.user.id })
-      .sort({ rating: 1 })
-      .select("title rating -_id");
-
-    // Final response
-    res.json({
-      ...summary[0],
-      best: best ? best.title : "N/A",
-      worst: worst ? worst.title : "N/A",
-    });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send("Server error");
-  }
 });
-
 
 module.exports = router;
