@@ -1,19 +1,14 @@
 import { Outlet, Link } from "react-router-dom";
+import Navbar from "./Navbar";
 
 function Layout() {
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <header className="bg-gray-900 p-4 flex justify-between">
-        <Link to="/" className="text-2xl font-bold text-red-500">WatchWise</Link>
-        <nav className="flex gap-4">
-          <Link to="/watchlist">Watchlist</Link>
-          <Link to="/dashboard">Dashboard</Link>
-          <button onClick={() => { localStorage.removeItem("token"); window.location.href = "/login"; }}>
-            Logout
-          </button>
-        </nav>
+      <header className="bg-gray-900 flex justify-between">
+        
+        <Navbar />
       </header>
-      <main className="p-6">
+      <main className="bg-[var(--color-background-primary)] dark:bg-[var(--color-background-primary)] text-[var(--color-text-primary)] dark:text-[var(--color-text-primary)]">
         <Outlet />
       </main>
     </div>

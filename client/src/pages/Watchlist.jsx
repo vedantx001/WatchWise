@@ -10,22 +10,23 @@ function Watchlist() {
   const [tvFilter, setTvFilter] = useState("all");
   const [activeSection, setActiveSection] = useState("movies");
 
+  // helper to always build poster url
+  const withPosterUrl = (m) => {
+    const isTmdbPath = m.posterPath && m.posterPath.startsWith("/");
+    return {
+      ...m,
+      posterUrl: m.posterPath
+        ? isTmdbPath
+          ? `https://image.tmdb.org/t/p/w500${m.posterPath}`
+          : m.posterPath
+        : fallbackPoster,
+    };
+  };
+
   useEffect(() => {
-    let isMounted = true; // ✅ prevent state update on unmount
+    let isMounted = true;
     api.get("/movies").then(async (res) => {
-      const withPosters = await Promise.all(
-        res.data.map(async (m) => {
-          const isTmdbPath = m.posterPath && m.posterPath.startsWith("/");
-          return {
-            ...m,
-            posterUrl: m.posterPath
-              ? isTmdbPath
-                ? `https://image.tmdb.org/t/p/w500${m.posterPath}`
-                : m.posterPath
-              : fallbackPoster,
-          };
-        })
-      );
+      const withPosters = res.data.map(withPosterUrl);
       if (isMounted) setItems(withPosters);
     });
     return () => {
@@ -46,17 +47,17 @@ function Watchlist() {
 
   const toggleFavorite = async (id) => {
     const res = await api.put(`/movies/${id}/favorite`);
-    setItems((prev) => prev.map((m) => (m._id === id ? res.data : m)));
+    setItems((prev) => prev.map((m) => (m._id === id ? withPosterUrl(res.data) : m)));
   };
 
   const startWatching = async (id) => {
     const res = await api.put(`/movies/${id}`, { status: "watching" });
-    setItems((prev) => prev.map((m) => (m._id === id ? res.data : m)));
+    setItems((prev) => prev.map((m) => (m._id === id ? withPosterUrl(res.data) : m)));
   };
 
   const completeWatching = async (id) => {
     const res = await api.put(`/movies/${id}`, { status: "completed" });
-    setItems((prev) => prev.map((m) => (m._id === id ? res.data : m)));
+    setItems((prev) => prev.map((m) => (m._id === id ? withPosterUrl(res.data) : m)));
   };
 
   // Animation variants
@@ -151,17 +152,24 @@ function Watchlist() {
                 animate="animate"
                 exit="exit"
                 whileHover={{ y: -6, scale: 1.01 }}
-                className="group relative rounded-2xl bg-gray-800/40 backdrop-blur-sm border border-white/10 shadow-xl hover:shadow-2xl transition-all duration-300 overflow-hidden flex flex-col"
+                className="group relative rounded-2xl backdrop-blur-sm border shadow-xl hover:shadow-2xl transition-all duration-300 overflow-hidden flex flex-col"
+                style={{
+                  background: "var(--color-background-secondary)",
+                  borderColor: "var(--color-accent)",
+                  color: "var(--color-text-primary)",
+                }}
               >
                 {/* Poster */}
-                <div className="relative h-60 bg-gray-700">
+                <div
+                  className="relative h-60"
+                  style={{ background: "var(--color-background-primary)" }}
+                >
                   <img
                     src={m.posterUrl || fallbackPoster}
                     alt={m.title}
                     loading="lazy"
                     className="w-full h-full object-cover transition-opacity duration-300"
                     onError={(e) => {
-                      /** @type {HTMLImageElement} */
                       const target = e.target;
                       target.onerror = null;
                       target.src = fallbackPoster;
@@ -192,10 +200,16 @@ function Watchlist() {
 
                 {/* Details */}
                 <div className="p-5 flex flex-col flex-grow">
-                  <h4 className="text-lg sm:text-xl font-bold text-white mb-1.5 line-clamp-2">
+                  <h4
+                    className="text-lg sm:text-xl font-bold mb-1.5 line-clamp-2"
+                    style={{ color: "var(--color-text-primary)" }}
+                  >
                     {m.title}
                   </h4>
-                  <p className="text-xs text-gray-400 mb-4">
+                  <p
+                    className="text-xs mb-4"
+                    style={{ color: "var(--color-text-secondary)" }}
+                  >
                     Added on {new Date(m.createdAt).toLocaleDateString()}
                   </p>
 
@@ -231,7 +245,8 @@ function Watchlist() {
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -8 }}
-                        className="text-emerald-400 font-semibold mb-3"
+                        className="font-semibold mb-3"
+                        style={{ color: "var(--color-accent)" }}
                       >
                         ✔ Completed
                       </motion.p>
@@ -246,7 +261,12 @@ function Watchlist() {
                     whileHover={{ y: -1 }}
                     whileTap={{ scale: 0.97 }}
                     aria-label="Delete item"
-                    className="mt-auto px-4 py-2 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 shadow-md ring-1 ring-white/10"
+                    className="mt-auto px-4 py-2 rounded-lg text-sm font-semibold shadow-md ring-1"
+                    style={{
+                      background: "var(--color-accent)",
+                      color: "var(--color-background-primary)",
+                      borderColor: "var(--color-accent)"
+                    }}
                   >
                     🗑 Delete
                   </motion.button>
@@ -269,7 +289,9 @@ function Watchlist() {
   );
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-black text-gray-100 p-6 sm:p-10">
+    <div
+      className="relative min-h-screen p-6 sm:p-10 bg-[var(--color-background-primary)] dark:bg-[var(--color-background-primary)] text-[var(--color-text-primary)] dark:text-[var(--color-text-primary)]"
+    >
       {/* Background glows */}
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <div className="absolute -top-24 -right-16 h-96 w-96 rounded-full bg-red-500/20 blur-3xl" />

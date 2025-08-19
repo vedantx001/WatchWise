@@ -1,3 +1,4 @@
+
 .trending-container {
   padding: 1rem;
 }
@@ -5,7 +6,7 @@
 .trending-title {
   font-size: 1.5rem;
   margin-bottom: 1rem;
-  color: #fff;
+  color: var(--color-text-primary);
 }
 
 .trending-grid {
@@ -17,7 +18,7 @@
 .trending-card {
   display: flex;
   flex-direction: column;
-  background-color: #1f1f1f;
+  background-color: var(--color-background-secondary);
   border-radius: 10px;
   overflow: hidden;
   transition: transform 0.2s ease-in-out;
@@ -39,7 +40,7 @@
 .trending-name {
   font-size: 1rem;
   font-weight: bold;
-  color: #fff;
+  color: var(--color-text-primary);
 }
 
 .trending-meta {
@@ -53,13 +54,13 @@
   display: inline-block;
   padding: 2px 8px;
   border-radius: 5px;
-  background: #00c853;
-  color: #fff;
+  background: var(--color-accent);
+  color: var(--color-background-primary);
   font-size: 0.8rem;
 }
 
 .rating {
-  color: orange;
+  color: var(--color-accent);
   font-size: 0.85rem;
 }
 
@@ -74,7 +75,7 @@
   .trending-card {
     flex-direction: row;
     align-items: center;
-    background-color: #252525;
+    background-color: var(--color-background-secondary);
     padding: 0.5rem;
   }
 

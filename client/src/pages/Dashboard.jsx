@@ -83,7 +83,9 @@ function Dashboard() {
   };
 
   return (
-    <div className="bg-gray-900 min-h-screen text-gray-200 font-sans p-4 md:p-8">
+    <div
+      className="min-h-screen font-sans p-4 md:p-8 bg-[var(--color-background-primary)] dark:bg-[var(--color-background-primary)] text-[var(--color-text-primary)] dark:text-[var(--color-text-primary)]"
+    >
       <div className="max-w-4xl mx-auto">
         {/* Content Type Selector (All / Movies / TV Shows) */} 
         <div className="flex justify-center border-b border-gray-700 mb-6 sticky top-0 bg-gray-900 z-10 py-2">
