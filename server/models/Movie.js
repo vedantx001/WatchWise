@@ -1,5 +1,24 @@
 const mongoose = require("mongoose");
 
+// Watched Episode Schema (for tracking progress)
+const WatchedEpisodeSchema = new mongoose.Schema({
+  season: { type: Number, required: true },
+  episode: { type: Number, required: true },
+  watchedAt: { type: Date, default: Date.now }, // when the episode was watched
+});
+
+const EpisodeSchema = new mongoose.Schema({
+  episodeNumber: { type: Number, required: true },
+  duration: { type: Number, default: 0 }, // in minutes
+});
+
+const SeasonSchema = new mongoose.Schema({
+  seasonNumber: { type: Number, required: true },
+  episodeCount: { type: Number, default: 0 },
+  duration: { type: Number, default: 0 }, // total season duration (minutes)
+  episodes: [EpisodeSchema],
+});
+
 const MovieSchema = new mongoose.Schema(
   {
     user: {
@@ -10,15 +29,14 @@ const MovieSchema = new mongoose.Schema(
     title: {
       type: String,
       required: true,
-      trim: true, // Add trim to remove whitespace
+      trim: true,
     },
-    // Changed genre to an array of strings
     genre: {
-      type: [String], // Now an array of strings
+      type: [String],
       default: [],
     },
     duration: {
-      type: Number,
+      type: Number, // For movies (minutes)
       default: 0,
     },
     status: {
@@ -39,24 +57,34 @@ const MovieSchema = new mongoose.Schema(
     completedDate: {
       type: Date,
     },
-    // --- NEW FIELDS ADDED ---
     posterPath: {
       type: String,
-      default: null, // Can be null if no poster is available
+      default: null,
     },
     tmdbId: {
-      type: String, // Store as string to handle potentially large numbers or different formats
-      required: false, // Not strictly required if adding manually without TMDB ID
-      // Consider making this unique per user + contentType in Day 2 for preventing duplicates
+      type: String,
+      required: false,
     },
     contentType: {
       type: String,
-      enum: ["movie", "tv"], // Crucial to distinguish between movies and TV shows
-      required: false, // Will be required when adding from TMDB
+      enum: ["movie", "tv"],
+      required: false,
     },
-    // --- END NEW FIELDS ---
+    releaseDate: { type: Date }, // release date (movie) or firstAirDate (tv)
+    language: { type: String, default: "en" }, // original language
+    lastWatchedEpisode: {
+      season: { type: Number, default: null },
+      episode: { type: Number, default: null },
+    },
+    watchedEpisodes: [WatchedEpisodeSchema],
+    inProduction: { type: Boolean, default: false },
+    totalSeasons: { type: Number, default: 0 },
+    totalEpisodes: { type: Number, default: 0 },
+    episodeDuration: { type: Number, default: 0 }, // avg duration per episode
+    seasons: [SeasonSchema],
+    totalDuration: { type: Number, default: 0 }, // in minutes (all episodes)
   },
   { timestamps: true }
 );
 
-module.exports = mongoose.model("Movie", MovieSchema);
+module.exports = mongoose.model("Movie", MovieSchema, "movies");

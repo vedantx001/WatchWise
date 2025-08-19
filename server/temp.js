@@ -1,5 +1,12 @@
-const crypto = require("crypto");
+const mongoose = require("mongoose");
+const Movie = require("./models/Movie");
+const dotenv = require("dotenv");
 
-const key = crypto.randomBytes(64).toString("hex");
+dotenv.config();
 
-console.log(key);
+(async () => {
+  await mongoose.connect(process.env.MONGO_URL);
+  const one = await Movie.findOne();
+  console.log(one);
+  await mongoose.disconnect();
+})();
