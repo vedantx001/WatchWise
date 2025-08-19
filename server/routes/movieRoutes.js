@@ -3,6 +3,7 @@ const Movie = require("../models/Movie");
 const auth = require("../middleware/auth");
 const { check, validationResult } = require("express-validator");
 const mongoose = require('mongoose');
+const { fetchMovieDetails, fetchTvShowDetails, fetchSeasonDetails, TMDB_IMAGE_BASE_URL } = require("../utils/tmdbApi");
 
 
 router.post(
@@ -16,12 +17,10 @@ router.post(
     check("status", "Invalid status").optional().isIn(["planned", "watching", "completed"]),
     check("contentType", "Content type must be 'movie' or 'tv'").optional().isIn(["movie", "tv"]),
     // If tmdbId is provided, it must be a string and contentType must also be present
-    check("tmdbId", "TMDB ID is required for TMDB content").optional().isString().if((value, { req }) => !!req.body.contentType),
-    check("contentType", "Content type is required if TMDB ID is provided").optional().isString().if((value, { req }) => !!req.body.tmdbId),
+    check("tmdbId", "TMDB ID is required for TMDB content").not().isEmpty().isString(),
+    check("contentType", "Content type is required if TMDB ID is provided").isIn(["movie", "tv"]),
   ],
   async (req, res) => {
-    console.log("REQ BODY:", req.body);
-    console.log("USER:", req.user);
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       console.log("Validation errors:", errors.array());
@@ -29,38 +28,98 @@ router.post(
     }
 
 
-    const { title, genre, duration, status, rating, posterPath, tmdbId, contentType } = req.body;
+    const { title, genre, duration, status, rating, posterPath, tmdbId, contentType, favorite } = req.body;
 
     try {
-      // Check for duplicate TMDB entry for the current user if tmdbId is provided
-      if (tmdbId && contentType) {
-        const existingMovie = await Movie.findOne({
-          user: req.user.id,
-          tmdbId,
-          contentType,
+        // Check for duplicate TMDB entry for the current user if tmdbId is provided
+        const existingContent = await Movie.findOne({
+            user: req.user.id,
+            tmdbId,
+            contentType,
         });
-        if (existingMovie) {
-          return res.status(400).json({ msg: "This content is already in your watchlist." });
+        if (existingContent) {
+            return res.status(400).json({ msg: "This content is already in your watchlist." });
         }
-      }
 
-      const newMovie = new Movie({
-        user: req.user.id,
-        title,
-        // Ensure genre is stored as an array
-        genre: Array.isArray(genre) ? genre : (genre ? genre.split(',').map(g => g.trim()) : []),
-        duration: duration || 0, // Default to 0 if not provided or invalid
-        status: status || "planned",
-        rating: rating || 0,
-        posterPath,
-        tmdbId,
-        contentType,
-        completedDate: status === "completed" ? new Date() : null,
-      });
+        // Fetch details from TMDB
+        let tmdbData;
+        if (contentType === "movie") {
+            tmdbData = await fetchMovieDetails(tmdbId);
+        } else if (contentType === "tv") {
+            tmdbData = await fetchTvShowDetails(tmdbId);
+        } else {
+            return res.status(400).json({ msg: "Invalid content type specified." });
+        }
 
-      const movie = await newMovie.save();
-      console.log(movie);
-      res.json(movie);
+        let newContentData = {
+            user: req.user.id,
+            tmdbId,
+            contentType,
+            status: status || "planned",
+            rating: rating || 0,
+            favorite: favorite || false,
+            completedDate: status === "completed" ? new Date() : null,
+            // Data mapped directly from TMDB response
+            title: tmdbData.title || tmdbData.name, // 'title' for movies, 'name' for TV shows
+            genre: tmdbData.genres ? tmdbData.genres.map(g => g.name) : [], // Extract only genre names
+            posterPath: tmdbData.poster_path ? `${TMDB_IMAGE_BASE_URL}${tmdbData.poster_path}` : null,
+            releaseDate: tmdbData.release_date || tmdbData.first_air_date, // Unified release/air date field
+            language: tmdbData.original_language || "en", // Original language from TMDB
+            inProduction: tmdbData.in_production || false, // Specific to TV shows
+        };
+
+        // Movie-Specific Fields
+        if (contentType === "movie") {
+            newContentData.duration = tmdbData.runtime || 0; // Movie runtime in minutes
+        }
+        // TV Show-Specific Fields
+        else if (contentType === "tv") {
+            newContentData.totalSeasons = tmdbData.number_of_seasons || 0;
+            newContentData.totalEpisodes = tmdbData.number_of_episodes || 0;
+
+            const seasons = [];
+            let totalCalculatedDuration = 0; // Accumulator for total show duration
+            let calculatedEpisodeCount = 0; // Accumulator for total episodes for avg duration
+
+            // Iterate through TMDB's summary seasons to fetch detailed episodes for each
+            // Filter out 'Specials' (season_number 0) if it has no episodes, to avoid unnecessary calls or empty data.
+            const relevantSeasons = tmdbData.seasons.filter(s => s.season_number !== 0 || s.episode_count > 0);
+
+            for (const tmdbSeason of relevantSeasons) {
+                const seasonDetails = await fetchSeasonDetails(tmdbId, tmdbSeason.season_number);
+                const episodes = [];
+                let seasonDuration = 0; // Accumulator for individual season duration
+
+                if (seasonDetails.episodes && seasonDetails.episodes.length > 0) {
+                    for (const tmdbEpisode of seasonDetails.episodes) {
+                        // TMDB's episode runtime can be available per-episode, or use series' average if not.
+                        const episodeDuration = tmdbEpisode.runtime || tmdbData.episode_run_time?.[0] || 0;
+                        episodes.push({
+                            episodeNumber: tmdbEpisode.episode_number,
+                            duration: episodeDuration,
+                        });
+                        seasonDuration += episodeDuration; // Add to current season's total duration
+                        totalCalculatedDuration += episodeDuration; // Add to overall show's total duration
+                        calculatedEpisodeCount++; // Increment total episodes count
+                    }
+                }
+
+                seasons.push({
+                    seasonNumber: tmdbSeason.season_number,
+                    episodeCount: seasonDetails.episodes ? seasonDetails.episodes.length : 0,
+                    duration: seasonDuration,
+                    episodes: episodes,
+                });
+            }
+            newContentData.seasons = seasons;
+            newContentData.totalDuration = totalCalculatedDuration;
+            newContentData.episodeDuration = calculatedEpisodeCount > 0 ? (totalCalculatedDuration / calculatedEpisodeCount) : 0;
+        }
+
+        const newContent = new Movie(newContentData);
+        const savedContent = await newContent.save();
+        console.log("Content added successfully: ", savedContent);
+        res.status(201).json(savedContent);
     } catch (err) {
       console.error(err.message);
       res.status(500).send("Server error");
