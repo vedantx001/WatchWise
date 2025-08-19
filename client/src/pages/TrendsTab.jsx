@@ -33,12 +33,7 @@ const Trending = () => {
 
   return (
     <div
-      className="trending-container"
-      style={{
-        background: "linear-gradient(135deg, var(--color-background-primary), var(--color-background-secondary) 60%, var(--color-accent) 100%)",
-        color: "var(--color-text-primary)",
-        minHeight: "100vh"
-      }}
+      className="trending-container min-h-screen bg-[var(--color-background-primary)] dark:bg-[var(--color-background-primary)] text-[var(--color-text-primary)] dark:text-[var(--color-text-primary)]"
     >
       <h2 className="trending-title" style={{ color: "var(--color-accent)" }}>Trending</h2>
       <div className="trending-grid">

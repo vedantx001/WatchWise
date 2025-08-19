@@ -17,3 +17,11 @@ html.dark {
     --color-text-secondary: #BFBFBF;
     --color-accent: #FF6B6B;
 }
+html {
+  background-color: var(--color-background-primary);
+  color: var(--color-text-primary);
+}
+html:not(.light) {
+  background-color: var(--color-background-primary);
+  color: var(--color-text-primary);
+}

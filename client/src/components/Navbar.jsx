@@ -8,7 +8,8 @@ import {
   XMarkIcon,
   HomeIcon,
   UserIcon,
-  UserPlusIcon
+  UserPlusIcon,
+  StarIcon
 } from "@heroicons/react/24/outline";
 import SearchBar from "./SearchBar";
 
@@ -66,12 +67,25 @@ function Navbar() {
     { name: "Home", path: "/", icon: HomeIcon },
     { name: "Watchlist", path: "/watchlist", icon: Bars3Icon },
     { name: "Dashboard", path: "/dashboard", icon: UserIcon },
+    { name: "Trending", path: "/trending", icon: StarIcon},
   ];
 
   const isActive = (path) => location.pathname === path;
 
   return (
     <>
+      {/* Search Modal Overlay (full page) */}
+      {isSearchOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          style={{ minHeight: '100vh' }}
+        >
+          <div className="w-full max-w-xl mx-auto px-4">
+            <SearchBar onClose={() => setIsSearchOpen(false)} />
+          </div>
+        </div>
+      )}
+
       <nav className={`bg-[var(--color-background-primary)] dark:bg-[var(--color-background-primary)] 
         fixed top-0 left-0 right-0 z-50
         ${isDarkMode ? 'bg-gray-900/95' : 'bg-white/95'} 
@@ -82,7 +96,6 @@ function Navbar() {
       `}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-
             {/* Logo & Brand */}
             <div
               className="flex items-center space-x-2 cursor-pointer group"
@@ -141,32 +154,20 @@ function Navbar() {
 
               {/* Search */}
               <div className="relative">
-                {isSearchOpen ? (
-                  <div className="absolute right-0 top-0 z-50 bg-inherit p-2 rounded shadow-lg flex items-center gap-2">
-                    <SearchBar />
-                    <button
-                      type="button"
-                      onClick={() => setIsSearchOpen(false)}
-                      className={`ml-2 p-2 rounded-lg ${isDarkMode ? 'hover:bg-gray-800 text-gray-400' : 'hover:bg-gray-100 text-gray-600'} transition-colors duration-200`}
-                    >
-                      <XMarkIcon className="w-5 h-5" />
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setIsSearchOpen(true)}
-                    className={`
-                      p-2 rounded-lg transition-all duration-300
-                      ${isDarkMode
-                        ? 'hover:bg-gray-800 text-gray-400 hover:text-white'
-                        : 'hover:bg-gray-100 text-gray-600 hover:text-gray-900'
-                      }
-                      hover:scale-110
-                    `}
-                  >
-                    <MagnifyingGlassIcon className="w-5 h-5" />
-                  </button>
-                )}
+                <button
+                  onClick={() => setIsSearchOpen((prev) => !prev)}
+                  className={`
+                    p-2 rounded-lg transition-all duration-300
+                    ${isDarkMode
+                      ? 'hover:bg-gray-800 text-gray-400 hover:text-white'
+                      : 'hover:bg-gray-100 text-gray-600 hover:text-gray-900'
+                    }
+                    hover:scale-110
+                  `}
+                  aria-label={isSearchOpen ? 'Close search' : 'Open search'}
+                >
+                  <MagnifyingGlassIcon className="w-5 h-5" />
+                </button>
               </div>
 
               {/* Theme Toggle */}
