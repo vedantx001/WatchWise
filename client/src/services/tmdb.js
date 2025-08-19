@@ -59,16 +59,32 @@ export const searchTVShows = async (query) => {
 };
 
 export const fetchMovieDetails = async (movieId) => {
-    const { data } = await axios.get(`${BASE_URL}/movie/${movieId}?api_key=${API_KEY}&language=en-US`);
-    return data;
+    try {
+      const { data } = await axios.get(`${BASE_URL}/movie/${movieId}?api_key=${API_KEY}&language=en-US`);
+      return data;
+    } catch (error) {
+        console.error("Error fetching movie details:", error);
+        throw error;
+    }
 };
 
-export const fetchTvShowDetails = async (tvId) => { // Renamed parameter to tvId for clarity
+export const fetchTvShowDetails = async (tvId) => {
     try {
         const { data } = await axios.get(`${BASE_URL}/tv/${tvId}?api_key=${API_KEY}&language=en-US`);
         return data;
     } catch (error) {
         console.error("Error fetching TV show details:", error);
-        throw error; // Re-throw to allow component to catch and handle
+        throw error;
+    }
+};
+
+export const fetchSeasonDetails = async (tvId, seasonNumber) => {
+    try {
+        const url = `${BASE_URL}/tv/${tvId}/season/${seasonNumber}?api_key=${API_KEY}&language=en-US`;
+        const { data } = await axios.get(url);
+        return data;
+    } catch (error) {
+        console.error(`Error fetching TMDB TV season details for TV ID ${tvId}, season ${seasonNumber}:`, error.message);
+        throw new Error(`Failed to fetch season details from TMDB for TV ID ${tvId}, season ${seasonNumber}`);
     }
 };
