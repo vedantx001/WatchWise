@@ -246,7 +246,7 @@ export default function GenreSearchModal({ open, onClose, onSearch }) {
                 <motion.div
                     ref={overlayRef}
                     // --- THIS IS THE FIXED LINE FOR TRUE CENTERING ---
-                    className="pt-80 fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-[3px]"
+                    className="pt-80 fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-lg"
                     onMouseDown={onBackdropClick}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -260,10 +260,10 @@ export default function GenreSearchModal({ open, onClose, onSearch }) {
                         aria-labelledby={labelId}
                         aria-describedby={descId}
                         className={cn(
-                            'relative w-full max-w-2xl bg-white/80 dark:bg-zinc-900/80',
+                            'relative w-full max-w-2xl bg-white/80 dark:bg-zinc-900/90',
                             'rounded-2xl shadow-2xl border border-zinc-300 dark:border-zinc-800',
                             'p-4 sm:p-7 md:p-8',
-                            'backdrop-blur-[6px] backdrop-saturate-150',
+                            'backdrop-blur-md backdrop-saturate-150',
                             'transition-all duration-200',
                             'max-h-[90vh] overflow-y-auto'
                         )}
@@ -553,7 +553,7 @@ export default function GenreSearchModal({ open, onClose, onSearch }) {
                         <div className="flex justify-end gap-2">
                             <button
                                 type="button"
-                                className="px-4 py-2 rounded-lg bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-semibold hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-all focus:outline-none focus:ring-2 focus:ring-[color:var(--color-accent)] focus:ring-offset-2 dark:focus:ring-offset-zinc-900"
+                                className="px-4 py-2 rounded-lg bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-semibold hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-all focus:outline-none focus:ring-2 focus:ring-[color:var(--color-accent)] focus:ring-offset-2 dark:focus:ring-offset-zinc-900 cursor-pointer"
                                 onClick={onClose}
                                 disabled={loading}
                             >
@@ -563,7 +563,7 @@ export default function GenreSearchModal({ open, onClose, onSearch }) {
                                 type="button"
                                 className={cn(
                                     'px-4 py-2 rounded-lg text-white font-semibold transition-all',
-                                    'bg-[color:var(--color-accent)] hover:bg-[color:var(--color-accent-dark,#4338CA)]',
+                                    'bg-[color:var(--color-accent)] hover:bg-[color:var(--color-accent-dark,#4338CA)] cursor-pointer',
                                     'focus:outline-none focus:ring-2 focus:ring-[color:var(--color-accent)] focus:ring-offset-2 dark:focus:ring-offset-zinc-900',
                                     'disabled:opacity-60 disabled:cursor-not-allowed'
                                 )}

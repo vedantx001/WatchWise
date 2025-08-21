@@ -41,50 +41,6 @@ function Footer() {
         }}
       />
 
-      {/* Curved accent wave separator */}
-      <div
-        aria-hidden
-        className="absolute -top-8 left-0 right-0 h-8 overflow-hidden pointer-events-none select-none"
-      >
-        <svg viewBox="0 0 1440 64" preserveAspectRatio="none" className="w-full h-full">
-          <defs>
-            <linearGradient id="footer-wave-grad" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="var(--color-accent)" stopOpacity="0.22" />
-              <stop offset="50%" stopColor="var(--color-accent)" stopOpacity="0.06" />
-              <stop offset="100%" stopColor="var(--color-accent)" stopOpacity="0.22" />
-            </linearGradient>
-          </defs>
-          <path
-            d="M0,32 C240,64 480,0 720,32 C960,64 1200,16 1440,32 L1440,64 L0,64 Z"
-            fill="url(#footer-wave-grad)"
-          />
-        </svg>
-      </div>
-
-      {/* Accent glow at the top */}
-      <div
-        aria-hidden
-        className="absolute inset-x-0 -top-10 h-24 pointer-events-none"
-        style={{
-          background:
-            "radial-gradient(800px 140px at 50% 0px, color-mix(in srgb, var(--color-accent) 14%, transparent), transparent 70%)",
-        }}
-      />
-
-      {/* Subtle dotted grid near top */}
-      <div
-        aria-hidden
-        className="absolute inset-0 pointer-events-none opacity-[0.10]"
-        style={{
-          backgroundImage:
-            "radial-gradient(1px 1px at 1px 1px, color-mix(in srgb, var(--color-text-secondary) 35%, transparent) 1px, transparent 1px)",
-          backgroundSize: "18px 18px",
-          maskImage: "linear-gradient(to bottom, black 0%, black 35%, transparent 80%)",
-          WebkitMaskImage:
-            "linear-gradient(to bottom, black 0%, black 35%, transparent 80%)",
-        }}
-      />
-
       <div className="relative max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-6">
         {/* Logo */}
         <button

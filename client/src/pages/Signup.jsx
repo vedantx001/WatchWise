@@ -52,15 +52,15 @@ function Signup() {
   const handleLoginClick = () => navigate("/login");
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center bg-[#090A0B] overflow-hidden">
-      {/* Decorative elements */}
-      <div className="absolute -top-40 -left-40 w-96 h-96 bg-red-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-32 left-20 w-80 h-80 bg-red-600/8 rounded-full blur-2xl pointer-events-none" />
-      <div className="absolute top-1/3 -right-20 w-72 h-72 bg-red-400/12 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/3 w-48 h-48 bg-red-500/6 rounded-full blur-xl pointer-events-none" />
+    <div className="relative min-h-[100dvh] flex items-center justify-center bg-[#090A0B] overflow-hidden px-4 py-8 sm:px-6 sm:py-12">
+      {/* Decorative elements (reduced/hidden on small screens) */}
+      <div className="hidden sm:block absolute -top-40 -left-40 w-64 h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 bg-red-500/10 rounded-full blur-2xl md:blur-3xl pointer-events-none" />
+      <div className="hidden sm:block absolute -bottom-32 left-6 w-56 h-56 md:w-72 md:h-72 bg-red-600/8 rounded-full blur-xl md:blur-2xl pointer-events-none" />
+      <div className="hidden md:block absolute top-1/3 -right-20 w-56 h-56 md:w-72 md:h-72 bg-red-400/12 rounded-full blur-2xl md:blur-3xl pointer-events-none" />
+      <div className="hidden md:block absolute bottom-1/4 right-1/3 w-40 h-40 md:w-48 md:h-48 bg-red-500/6 rounded-full blur-lg md:blur-xl pointer-events-none" />
       
       {/* Subtle grid pattern overlay */}
-      <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=&quot;60&quot; height=&quot;60&quot; viewBox=&quot;0 0 60 60&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot; %3E%3Cg fill=&quot;none&quot; fill-rule=&quot;evenodd&quot;%3E%3Cg fill=&quot;%23FF6B6B&quot; fill-opacity=&quot;0.03&quot;%3E%3Ccircle cx=&quot;30&quot; cy=&quot;30&quot; r=&quot;1&quot;/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] pointer-events-none" />
+      <div className="hidden sm:block absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=&quot;60&quot; height=&quot;60&quot; viewBox=&quot;0 0 60 60&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot; %3E%3Cg fill=&quot;none&quot; fill-rule=&quot;evenodd&quot;%3E%3Cg fill=&quot;%23FF6B6B&quot; fill-opacity=&quot;0.03&quot;%3E%3Ccircle cx=&quot;30&quot; cy=&quot;30&quot; r=&quot;1&quot;/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] pointer-events-none" />
 
       <AnimatePresence>
         <motion.div
@@ -69,19 +69,19 @@ function Signup() {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 32, scale: 0.98 }}
           transition={{ type: "spring", stiffness: 200, damping: 20 }}
-          className="relative z-10 w-full max-w-md"
+          className="relative z-10 w-full max-w-[20rem] sm:max-w-[22rem] md:max-w-[26rem]"
         >
           {/* Main card */}
-          <div className="bg-[#1F1F1F]/80 backdrop-blur-xl border border-white/5 rounded-2xl shadow-2xl shadow-black/20 p-8">
+          <div className="bg-[#1F1F1F]/80 supports-[backdrop-filter]:backdrop-blur-xl border border-white/5 rounded-2xl shadow-2xl shadow-black/20 p-6 sm:p-8">
             {/* Logo & Brand */}
-            <div className="flex flex-col items-center mb-8">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-red-500 to-red-600 shadow-lg shadow-red-500/25 mb-4 group">
-                <span className="text-white font-bold text-xl">W</span>
+            <div className="flex flex-col items-center mb-6 sm:mb-8">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-red-500 to-red-600 shadow-lg shadow-red-500/25 mb-3 sm:mb-4">
+                <span className="text-white font-bold text-lg sm:text-xl">W</span>
               </div>
-              <h1 className="text-2xl font-bold text-[#F8F8F2] tracking-tight">
+              <h1 className="text-xl sm:text-2xl font-bold text-[#F8F8F2] tracking-tight">
                 WatchWise
               </h1>
-              <p className="text-[#BFBFBF] text-sm mt-2 text-center">
+              <p className="text-[#BFBFBF] text-xs sm:text-sm mt-1.5 sm:mt-2 text-center">
                 Create your account to start your watch journey
               </p>
             </div>
@@ -93,16 +93,16 @@ function Signup() {
                   initial={{ opacity: 0, y: -10, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -10, scale: 0.98 }}
-                  className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl mb-6 backdrop-blur-sm"
+                  className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 sm:p-4 rounded-xl mb-5 sm:mb-6 backdrop-blur-sm"
                 >
                   {errors.map((error, idx) => (
-                    <p key={idx} className="text-sm font-medium">{error.msg}</p>
+                    <p key={idx} className="text-sm font-medium leading-relaxed">{error.msg}</p>
                   ))}
                 </motion.div>
               )}
             </AnimatePresence>
 
-            <form onSubmit={handleSignup} className="space-y-6">
+            <form onSubmit={handleSignup} className="space-y-5 sm:space-y-6">
               {/* Name field */}
               <div className="relative group">
                 <input
@@ -111,7 +111,7 @@ function Signup() {
                   placeholder=" "
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="block w-full px-4 pt-6 pb-2 bg-[#090A0B]/50 border border-white/10 rounded-xl text-[#F8F8F2] placeholder-transparent focus:border-red-500/50 focus:ring-2 focus:ring-red-500/20 focus:outline-none transition-all duration-200 peer group-hover:border-white/20"
+                  className="block w-full px-4 pt-6 pb-2 bg-[#090A0B]/50 border border-white/10 rounded-xl text-base text-[#F8F8F2] placeholder-transparent focus:border-red-500/50 focus:ring-2 focus:ring-red-500/20 focus:outline-none transition-all duration-200 peer group-hover:border-white/20"
                   required
                   autoComplete="name"
                 />
@@ -131,7 +131,7 @@ function Signup() {
                   placeholder=" "
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full px-4 pt-6 pb-2 bg-[#090A0B]/50 border border-white/10 rounded-xl text-[#F8F8F2] placeholder-transparent focus:border-red-500/50 focus:ring-2 focus:ring-red-500/20 focus:outline-none transition-all duration-200 peer group-hover:border-white/20"
+                  className="block w-full px-4 pt-6 pb-2 bg-[#090A0B]/50 border border-white/10 rounded-xl text-base text-[#F8F8F2] placeholder-transparent focus:border-red-500/50 focus:ring-2 focus:ring-red-500/20 focus:outline-none transition-all duration-200 peer group-hover:border-white/20"
                   required
                   autoComplete="email"
                 />
@@ -151,7 +151,7 @@ function Signup() {
                   placeholder=" "
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full px-4 pt-6 pb-2 pr-12 bg-[#090A0B]/50 border border-white/10 rounded-xl text-[#F8F8F2] placeholder-transparent focus:border-red-500/50 focus:ring-2 focus:ring-red-500/20 focus:outline-none transition-all duration-200 peer group-hover:border-white/20"
+                  className="block w-full px-4 pt-6 pb-2 pr-12 bg-[#090A0B]/50 border border-white/10 rounded-xl text-base text-[#F8F8F2] placeholder-transparent focus:border-red-500/50 focus:ring-2 focus:ring-red-500/20 focus:outline-none transition-all duration-200 peer group-hover:border-white/20"
                   required
                   autoComplete="new-password"
                 />
@@ -164,7 +164,7 @@ function Signup() {
                 <button
                   type="button"
                   onClick={togglePasswordVisibility}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#BFBFBF] hover:text-[#F8F8F2] transition-colors duration-200 p-1 cursor-pointer"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#BFBFBF] hover:text-[#F8F8F2] transition-colors duration-200 p-1 cursor-pointer"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? (
@@ -187,7 +187,7 @@ function Signup() {
                 type="submit"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                className="w-full py-4 rounded-xl bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold text-base shadow-lg shadow-red-500/25 hover:shadow-red-500/40 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:ring-offset-2 focus:ring-offset-[#1F1F1F] transition-all duration-200 relative overflow-hidden group cursor-pointer"
+                className="w-full py-3.5 sm:py-4 rounded-xl bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold text-sm sm:text-base shadow-lg shadow-red-500/25 hover:shadow-red-500/40 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:ring-offset-0 sm:focus:ring-offset-[#1F1F1F] transition-all duration-200 relative overflow-hidden group cursor-pointer"
               >
                 <span className="relative z-10">Create account</span>
                 <div className="absolute inset-0 bg-gradient-to-r from-red-400 to-red-500 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
@@ -195,7 +195,7 @@ function Signup() {
             </form>
 
             {/* Footer */}
-            <div className="mt-8 pt-6 border-t border-white/5">
+            <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-white/5">
               <p className="text-center text-[#BFBFBF] text-sm">
                 Already have an account?{" "}
                 <button 
@@ -208,8 +208,8 @@ function Signup() {
             </div>
           </div>
 
-          {/* Subtle glow effect */}
-          <div className="absolute inset-0 bg-gradient-to-r from-red-500/5 to-red-600/5 rounded-2xl blur-xl -z-10" />
+          {/* Subtle glow effect (hide on very small screens) */}
+          <div className="hidden sm:block absolute inset-0 bg-gradient-to-r from-red-500/5 to-red-600/5 rounded-2xl blur-xl -z-10" />
         </motion.div>
       </AnimatePresence>
     </div>

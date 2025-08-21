@@ -279,7 +279,15 @@ function Navbar() {
               <GenreSearch
                 open={genreModalOpen}
                 onClose={() => setGenreModalOpen(false)}
-                onSearch={() => setGenreModalOpen(false)}
+                onSearch={({ movieGenres, tvGenres }) => {
+                  const params = new URLSearchParams();
+                  if (movieGenres && movieGenres.length)
+                    params.set('movieGenres', movieGenres.join(','));
+                  if (tvGenres && tvGenres.length)
+                    params.set('tvGenres', tvGenres.join(','));
+                  navigate(`/search?${params.toString()}`);
+                  setGenreModalOpen(false);
+                }}
               />
 
               {/* Theme Toggle */}

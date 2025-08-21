@@ -1,5 +1,5 @@
-// Discover movies by genre(s)
-export const discoverMoviesByGenres = async (genreIds) => {
+// Discover movies by genre(s) with pagination
+export const discoverMoviesByGenres = async (genreIds, page = 1) => {
   try {
     const { data } = await axios.get(`${BASE_URL}/discover/movie`, {
       params: {
@@ -7,18 +7,18 @@ export const discoverMoviesByGenres = async (genreIds) => {
         with_genres: genreIds,
         sort_by: 'popularity.desc',
         include_adult: false,
-        page: 1
+        page
       }
     });
-    return data.results;
+    return { results: data.results, totalPages: data.total_pages, page: data.page };
   } catch (error) {
     console.error("Error discovering movies by genres:", error);
-    return [];
+    return { results: [], totalPages: 1, page: 1 };
   }
 };
 
-// Discover TV shows by genre(s)
-export const discoverTVByGenres = async (genreIds) => {
+// Discover TV shows by genre(s) with pagination
+export const discoverTVByGenres = async (genreIds, page = 1) => {
   try {
     const { data } = await axios.get(`${BASE_URL}/discover/tv`, {
       params: {
@@ -26,13 +26,13 @@ export const discoverTVByGenres = async (genreIds) => {
         with_genres: genreIds,
         sort_by: 'popularity.desc',
         include_adult: false,
-        page: 1
+        page
       }
     });
-    return data.results;
+    return { results: data.results, totalPages: data.total_pages, page: data.page };
   } catch (error) {
     console.error("Error discovering TV shows by genres:", error);
-    return [];
+    return { results: [], totalPages: 1, page: 1 };
   }
 };
 // src/services/tmdb.js
@@ -65,33 +65,35 @@ export const getTrendingTVShows = async () => {
   }
 };
 
-export const searchMovies = async (query) => {
+export const searchMovies = async (query, page = 1) => {
   try {
     const { data } = await axios.get(`${BASE_URL}/search/movie`, {
       params: {
         api_key: API_KEY,
-        query: query
+        query: query,
+        page
       }
     });
-    return data.results;
+    return { results: data.results, totalPages: data.total_pages, page: data.page };
   } catch (error) {
     console.error("Error searching movies:", error);
-    return [];
+    return { results: [], totalPages: 1, page: 1 };
   }
 };
 
-export const searchTVShows = async (query) => {
+export const searchTVShows = async (query, page = 1) => {
   try {
     const { data } = await axios.get(`${BASE_URL}/search/tv`, {
       params: {
         api_key: API_KEY,
-        query: query
+        query: query,
+        page
       }
     });
-    return data.results;
+    return { results: data.results, totalPages: data.total_pages, page: data.page };
   } catch (error) {
     console.error("Error searching TV shows:", error);
-    return [];
+    return { results: [], totalPages: 1, page: 1 };
   }
 };
 
