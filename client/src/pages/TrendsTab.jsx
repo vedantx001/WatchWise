@@ -32,15 +32,21 @@ const Trending = () => {
   };
 
   return (
-    <div className="trending-container">
-      <h2 className="trending-title">Trending</h2>
+    <div
+      className="trending-container min-h-screen bg-[var(--color-background-primary)] dark:bg-[var(--color-background-primary)] text-[var(--color-text-primary)] dark:text-[var(--color-text-primary)]"
+    >
+      <h2 className="trending-title" style={{ color: "var(--color-accent)" }}>Trending</h2>
       <div className="trending-grid">
         {combinedTrends.map((item) => (
-          <div 
-            key={item.id} 
+          <div
+            key={item.id}
             className="trending-card"
             onClick={() => handleCardClick(item)}
-            style={{ cursor: "pointer" }}
+            style={{
+              cursor: "pointer",
+              background: "var(--color-background-secondary)",
+              color: "var(--color-text-primary)"
+            }}
           >
             <img
               src={
@@ -48,15 +54,16 @@ const Trending = () => {
                   ? `${IMG_URL}${item.poster_path}`
                   : fallbackPoster
               }
-              className="trending-poster" 
+              className="trending-poster"
+              style={{ background: "var(--color-background-primary)" }}
             />
             <div className="trending-info">
-              <h3 className="trending-name">{item.title || item.name}</h3>
+              <h3 className="trending-name" style={{ color: "var(--color-text-primary)" }}>{item.title || item.name}</h3>
               <div className="trending-meta">
-                <span className="type-tag">
+                <span className="type-tag" style={{ background: "var(--color-accent)", color: "var(--color-background-primary)" }}>
                   {item.media_type === "movie" ? "Movie" : "TV Show"}
                 </span>
-                <span className="rating">
+                <span className="rating" style={{ color: "var(--color-accent)" }}>
                   {item.vote_average ? item.vote_average.toFixed(1) : "N/A"} / 10
                 </span>
               </div>

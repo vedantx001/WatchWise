@@ -20,10 +20,12 @@ function App() {
           <Route path="/watchlist" element={<Watchlist />} />
           <Route path="/dashboard" element={<Dashboard />} />
         </Route>
-        <Route path="/" element={<Landing />} />
-        <Route path="/search/:query" element={<SearchResults />} />
-        <Route path="/trending" element={<Trending />}/>
-        <Route path="/details/:type/:id" element={<ContentDetails />} />
+        <Route element={<Layout />}>
+          <Route path="/" element={<Landing />} />
+          <Route path="/search/:query" element={<SearchResults />} />
+          <Route path="/trending" element={<Trending />} />
+          <Route path="/details/:type/:id" element={<ContentDetails />} />
+        </Route>
       </Routes>
     </Router>
   );
