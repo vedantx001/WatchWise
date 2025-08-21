@@ -1,60 +1,90 @@
 // src/components/SearchResults.jsx
-import { useParams } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { searchMovies, searchTVShows } from "../services/tmdb";
+import { searchMovies, searchTVShows, discoverMoviesByGenres, discoverTVByGenres } from "../services/tmdb";
 import "../styles/search.css";
 import fallbackPoster from "../assets/fallback_poster2.png";
 import { useNavigate } from "react-router-dom"; 
 
 export default function SearchResults() {
   const { query } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const [results, setResults] = useState([]);
   const IMG_URL = "https://image.tmdb.org/t/p/w200";
 
   useEffect(() => {
     const fetchData = async () => {
-      // Add loading state here if you want to show a spinner/message
-      // setLoading(true); 
-      const movies = await searchMovies(query);
-      const tvShows = await searchTVShows(query);
-
-      // Tag and merge
-      const combined = [
-        ...movies.map((item) => ({ ...item, media_type: "movie" })),
-        ...tvShows.map((item) => ({ ...item, media_type: "tv" })),
-      ];
-
-      // Filter out items without a poster path to avoid broken images
-      const filtered = combined.filter(item => item.poster_path);
-
-      // Shuffle so they're mixed (optional, keep if desired)
-      const shuffled = filtered.sort(() => Math.random() - 0.5);
-      setResults(shuffled);
-      // setLoading(false);
+      const params = new URLSearchParams(location.search);
+      const movieGenres = params.get('movieGenres');
+      const tvGenres = params.get('tvGenres');
+      // If genre search
+      if (movieGenres || tvGenres) {
+        let movieResults = [];
+        let tvResults = [];
+        if (movieGenres) {
+          movieResults = await discoverMoviesByGenres(movieGenres);
+        }
+        if (tvGenres) {
+          tvResults = await discoverTVByGenres(tvGenres);
+        }
+        const combined = [
+          ...movieResults.map((item) => ({ ...item, media_type: "movie" })),
+          ...tvResults.map((item) => ({ ...item, media_type: "tv" })),
+        ];
+        const filtered = combined.filter(item => item.poster_path);
+        const shuffled = filtered.sort(() => Math.random() - 0.5);
+        setResults(shuffled);
+        return;
+      }
+      // Otherwise, normal text search
+      if (query) {
+        const movies = await searchMovies(query);
+        const tvShows = await searchTVShows(query);
+        const combined = [
+          ...movies.map((item) => ({ ...item, media_type: "movie" })),
+          ...tvShows.map((item) => ({ ...item, media_type: "tv" })),
+        ];
+        const filtered = combined.filter(item => item.poster_path);
+        const shuffled = filtered.sort(() => Math.random() - 0.5);
+        setResults(shuffled);
+      }
     };
     fetchData();
-  }, [query]);
+  }, [query, location.search]);
 
-  // --- KEY CHANGE HERE ---
   const handleCardClick = (item) => {
-    // Navigate to the generic /details/:type/:id route
     navigate(`/details/${item.media_type}/${item.id}`);
   };
-  // -----------------------
 
   return (
     <div className="search-results">
-      {/* Decode URI component for display, as query from useParams is encoded */}
-      <h2>Results for "{decodeURIComponent(query || '')}"</h2> 
+      {/* Show heading based on search type */}
+      {(() => {
+        const params = new URLSearchParams(location.search);
+        const movieGenres = params.get('movieGenres');
+        const tvGenres = params.get('tvGenres');
+        if (movieGenres || tvGenres) {
+          return <h2>Results by Genre</h2>;
+        }
+        return <h2>Results for "{decodeURIComponent(query || '')}"</h2>;
+      })()}
+
 
       {/* Add conditional rendering for no results or loading */}
-      {results.length === 0 && !query && (
-        <p>Start typing to search for movies or TV shows!</p>
-      )}
-      {results.length === 0 && query && (
-        <p>No results found for "{decodeURIComponent(query)}".</p>
-      )}
+      {(() => {
+        const params = new URLSearchParams(location.search);
+        const movieGenres = params.get('movieGenres');
+        const tvGenres = params.get('tvGenres');
+        if (results.length === 0) {
+          if (query || movieGenres || tvGenres) {
+            return <p>No results found.</p>;
+          } else {
+            return <p>Start typing to search for movies or TV shows!</p>;
+          }
+        }
+        return null;
+      })()}
 
       <div className="results-grid">
         {results.map((item) => (
@@ -70,9 +100,9 @@ export default function SearchResults() {
                   ? `${IMG_URL}${item.poster_path}`
                   : fallbackPoster
               }
-              alt={item.title || item.name} // Use title for movies, name for TV
+              alt={item.title || item.name}
             />
-            <p>{item.title || item.name}</p> {/* Use title for movies, name for TV */}
+            <p>{item.title || item.name}</p>
             <span className="type-tag">
               {item.media_type === "movie" ? "Movie" : "TV Show"}
             </span>

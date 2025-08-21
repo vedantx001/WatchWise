@@ -1,3 +1,40 @@
+// Discover movies by genre(s)
+export const discoverMoviesByGenres = async (genreIds) => {
+  try {
+    const { data } = await axios.get(`${BASE_URL}/discover/movie`, {
+      params: {
+        api_key: API_KEY,
+        with_genres: genreIds,
+        sort_by: 'popularity.desc',
+        include_adult: false,
+        page: 1
+      }
+    });
+    return data.results;
+  } catch (error) {
+    console.error("Error discovering movies by genres:", error);
+    return [];
+  }
+};
+
+// Discover TV shows by genre(s)
+export const discoverTVByGenres = async (genreIds) => {
+  try {
+    const { data } = await axios.get(`${BASE_URL}/discover/tv`, {
+      params: {
+        api_key: API_KEY,
+        with_genres: genreIds,
+        sort_by: 'popularity.desc',
+        include_adult: false,
+        page: 1
+      }
+    });
+    return data.results;
+  } catch (error) {
+    console.error("Error discovering TV shows by genres:", error);
+    return [];
+  }
+};
 // src/services/tmdb.js
 import axios from "axios";
 
