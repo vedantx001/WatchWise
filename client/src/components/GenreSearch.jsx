@@ -246,7 +246,7 @@ export default function GenreSearchModal({ open, onClose, onSearch }) {
                 <motion.div
                     ref={overlayRef}
                     // --- THIS IS THE FIXED LINE FOR TRUE CENTERING ---
-                    className="pt-80 fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-lg"
+                    className="pt-[350px] fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-lg"
                     onMouseDown={onBackdropClick}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
