@@ -1,3 +1,9 @@
+// src/services/tmdb.js
+import axios from "axios";
+
+const API_KEY = import.meta.env.VITE_TMDB_API_KEY;
+const BASE_URL = "https://api.themoviedb.org/3";
+
 // Discover movies by genre(s) with pagination
 export const discoverMoviesByGenres = async (genreIds, page = 1) => {
   try {
@@ -35,11 +41,6 @@ export const discoverTVByGenres = async (genreIds, page = 1) => {
     return { results: [], totalPages: 1, page: 1 };
   }
 };
-// src/services/tmdb.js
-import axios from "axios";
-
-const API_KEY = import.meta.env.VITE_TMDB_API_KEY;
-const BASE_URL = "https://api.themoviedb.org/3";
 
 export const getTrendingMovies = async () => {
   try {

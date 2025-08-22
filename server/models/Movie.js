@@ -10,6 +10,10 @@ const WatchedEpisodeSchema = new mongoose.Schema({
 const EpisodeSchema = new mongoose.Schema({
   episodeNumber: { type: Number, required: true },
   duration: { type: Number, default: 0 }, // in minutes
+  name: { type: String, default: "" },
+  overview: { type: String, default: "" },
+  airDate: { type: Date },
+  voteAverage: { type: Number, default: 0 },
 });
 
 const SeasonSchema = new mongoose.Schema({
@@ -17,6 +21,19 @@ const SeasonSchema = new mongoose.Schema({
   episodeCount: { type: Number, default: 0 },
   duration: { type: Number, default: 0 }, // total season duration (minutes)
   episodes: [EpisodeSchema],
+
+  status: {
+    type: String,
+    enum: ["planned", "watching", "completed"],
+    default: "planned",
+  },
+  completedDate: { type: Date },
+
+  // Useful display fields
+  posterPath: { type: String, default: null },
+  overview: { type: String, default: "" },
+  airDate: { type: Date },
+  voteAverage: { type: Number, default: 0 },
 });
 
 const MovieSchema = new mongoose.Schema(
@@ -72,11 +89,15 @@ const MovieSchema = new mongoose.Schema(
     },
     releaseDate: { type: Date }, // release date (movie) or firstAirDate (tv)
     language: { type: String, default: "en" }, // original language
+
+    //Episode tracking
     lastWatchedEpisode: {
       season: { type: Number, default: null },
       episode: { type: Number, default: null },
     },
     watchedEpisodes: [WatchedEpisodeSchema],
+
+    // TV Show meta
     inProduction: { type: Boolean, default: false },
     totalSeasons: { type: Number, default: 0 },
     totalEpisodes: { type: Number, default: 0 },

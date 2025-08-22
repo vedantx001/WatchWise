@@ -9,7 +9,6 @@ import Layout from "./components/Layout";
 import Trending from "./pages/TrendsTab";
 import SearchResults from "./pages/SearchResults";
 import ContentDetails from "./pages/ContentDetails";
-import TrailerPlayer from "./components/TrailerPlayer";
 
 function App() {
   return (
@@ -26,8 +25,7 @@ function App() {
           <Route path="/search" element={<SearchResults />} />
           <Route path="/search/:query" element={<SearchResults />} />
           <Route path="/trending" element={<Trending />} />
-    <Route path="/details/:type/:id" element={<ContentDetails />} />
-    <Route path="/trailer/:type/:id" element={<TrailerPlayer />} />
+          <Route path="/details/:type/:id" element={<ContentDetails />} />
         </Route>
       </Routes>
     </Router>
