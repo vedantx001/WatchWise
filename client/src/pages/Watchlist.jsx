@@ -1,16 +1,18 @@
-import { useEffect, useState } from "react";
+// src/pages/Watchlist.jsx (or wherever it lives)
+import { useEffect, useState, Fragment } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import api from "../api";
 import SearchBar from "../components/SearchBar";
 import fallbackPoster from "../assets/fallback_poster2.png";
+import { useNavigate } from "react-router-dom";
 
 function Watchlist() {
+  const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [movieFilter, setMovieFilter] = useState("all");
   const [tvFilter, setTvFilter] = useState("all");
   const [activeSection, setActiveSection] = useState("movies");
 
-  // helper to always build poster url
   const withPosterUrl = (m) => {
     const isTmdbPath = m.posterPath && m.posterPath.startsWith("/");
     return {
@@ -25,13 +27,11 @@ function Watchlist() {
 
   useEffect(() => {
     let isMounted = true;
-    api.get("/movies").then(async (res) => {
+    api.get("/movies").then((res) => {
       const withPosters = res.data.map(withPosterUrl);
       if (isMounted) setItems(withPosters);
     });
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, []);
 
   const clearWatchlist = async () => {
@@ -60,42 +60,68 @@ function Watchlist() {
     setItems((prev) => prev.map((m) => (m._id === id ? withPosterUrl(res.data) : m)));
   };
 
-  // Animation variants
   const cardVariants = {
     initial: { opacity: 0, y: 24, scale: 0.98 },
-    animate: {
-      opacity: 1,
-      y: 0,
-      scale: 1,
-      transition: { duration: 0.35, ease: [0.22, 1, 0.36, 1] },
-    },
+    animate: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.35, ease: [0.22, 1, 0.36, 1] } },
     exit: { opacity: 0, y: 20, scale: 0.98, transition: { duration: 0.2 } },
   };
 
   // Filters
   const filteredMovies = items.filter(
-    (m) =>
-      m.contentType === "movie" &&
-      (movieFilter === "all" ? true : m.status === movieFilter)
-  );
-  const filteredTV = items.filter(
-    (m) =>
-      m.contentType === "tv" &&
-      (tvFilter === "all" ? true : m.status === tvFilter)
+    (m) => m.contentType === "movie" && (movieFilter === "all" ? true : m.status === movieFilter)
   );
 
-  // Renderer
-  const renderSection = (title, filter, setFilter, data) => (
+  // Group TV shows by tmdbId (one doc per show; seasons inside)
+  const tvItems = items.filter((m) => m.contentType === "tv");
+  const tvGrouped = tvItems.reduce((acc, item) => {
+    acc[item.tmdbId] = acc[item.tmdbId] || [];
+    acc[item.tmdbId].push(item);
+    return acc;
+  }, {});
+  // In case you ever store multiple docs per show (shouldn't), flatten by newest
+  const tvShows = Object.values(tvGrouped).map((arr) => arr.sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt))[0]);
+
+  const tvFiltered = tvShows.filter((m) => {
+    if (tvFilter === "all") return true;
+    // Consider a show "watching/completed" if any season matches that status
+    const has = (status) => (m.seasons || []).some((s) => s.status === status);
+    return has(tvFilter);
+  });
+
+  const renderSeasonChips = (show) => {
+    const seasons = show.seasons || [];
+    if (!seasons.length) {
+      return <p className="text-sm text-gray-400">No seasons added yet.</p>;
+    }
+    return (
+      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {seasons.map((s) => (
+          <button
+            key={s.seasonNumber}
+            onClick={() => navigate(`/details/tv/${show.tmdbId}/season/${s.seasonNumber}`)}
+            className={`w-full text-left px-3 py-2 rounded-lg border transition 
+              ${s.status === "completed" ? "border-green-500/60" :
+                s.status === "watching" ? "border-yellow-500/60" : "border-white/10"} 
+              hover:bg-white/5`}
+            title={`Open Season ${s.seasonNumber}`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-semibold">Season {s.seasonNumber}</span>
+              <span className="text-xs opacity-80">{s.episodeCount} eps</span>
+            </div>
+            <div className="text-xs mt-1 opacity-80">
+              {s.status === "completed" ? "✅ Completed" : s.status === "watching" ? "⏳ Watching" : "📝 Planned"}
+            </div>
+          </button>
+        ))}
+      </div>
+    );
+  };
+
+  const renderSection = (title, filter, setFilter, data, isTV = false) => (
     <section className="mb-16">
-      {/* Section header */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex justify-between items-center mb-8"
-      >
-        <h3 className="text-3xl font-extrabold bg-gradient-to-r from-red-400 via-rose-400 to-orange-300 bg-clip-text text-transparent">
-          {title}
-        </h3>
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex justify-between items-center mb-8">
+        <h3 className="text-3xl font-extrabold bg-gradient-to-r from-red-400 via-rose-400 to-orange-300 bg-clip-text text-transparent">{title}</h3>
         <motion.span
           key={data.length + filter}
           initial={{ scale: 0.6, opacity: 0 }}
@@ -112,20 +138,13 @@ function Watchlist() {
         <div className="inline-flex items-center gap-1 rounded-full bg-gray-800/60 p-1 ring-1 ring-white/10 backdrop-blur">
           {["all", "planned", "watching", "completed"].map((f) => {
             const active = filter === f;
-            const labelMap = {
-              all: "All",
-              planned: "📝 Planned",
-              watching: "⏳ Watching",
-              completed: "✅ Completed",
-            };
+            const labelMap = { all: "All", planned: "📝 Planned", watching: "⏳ Watching", completed: "✅ Completed" };
             return (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
                 className={`px-4 sm:px-5 py-2 rounded-full font-semibold transition duration-200 focus:outline-none ${
-                  active
-                    ? "bg-gradient-to-r from-red-600 to-rose-600 text-white shadow"
-                    : "text-gray-300 hover:text-white hover:bg-gray-700/60"
+                  active ? "bg-gradient-to-r from-red-600 to-rose-600 text-white shadow" : "text-gray-300 hover:text-white hover:bg-gray-700/60"
                 }`}
                 aria-pressed={active}
               >
@@ -137,10 +156,7 @@ function Watchlist() {
       </div>
 
       {/* Grid */}
-      <motion.div
-        layout
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
-      >
+      <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {data.length > 0 ? (
           <AnimatePresence>
             {data.map((m) => (
@@ -160,39 +176,23 @@ function Watchlist() {
                 }}
               >
                 {/* Poster */}
-                <div
-                  className="relative h-60"
-                  style={{ background: "var(--color-background-primary)" }}
-                >
+                <div className="relative h-60" style={{ background: "var(--color-background-primary)" }}>
                   <img
                     src={m.posterUrl || fallbackPoster}
                     alt={m.title}
                     loading="lazy"
                     className="w-full h-full object-cover transition-opacity duration-300"
-                    onError={(e) => {
-                      const target = e.target;
-                      target.onerror = null;
-                      target.src = fallbackPoster;
-                    }}
+                    onError={(e) => { e.target.onerror = null; e.target.src = fallbackPoster; }}
                   />
-
-                  {/* Favorite heart */}
+                  {/* Favorite */}
                   <motion.button
                     onClick={() => toggleFavorite(m._id)}
                     whileTap={{ scale: 0.85, rotate: -8 }}
-                    animate={
-                      m.favorite
-                        ? { scale: [1, 1.3, 1], rotate: [0, -10, 0] }
-                        : { scale: 1, rotate: 0 }
-                    }
+                    animate={m.favorite ? { scale: [1, 1.3, 1], rotate: [0, -10, 0] } : { scale: 1, rotate: 0 }}
                     transition={{ duration: 0.35 }}
                     title={m.favorite ? "Unfavorite" : "Favorite"}
                     aria-label={m.favorite ? "Unfavorite" : "Favorite"}
-                    className={`absolute top-3 right-3 text-3xl drop-shadow ${
-                      m.favorite
-                        ? "text-red-500"
-                        : "text-gray-300 hover:text-red-400"
-                    }`}
+                    className={`absolute top-3 right-3 text-3xl drop-shadow ${m.favorite ? "text-red-500" : "text-gray-300 hover:text-red-400"}`}
                   >
                     {m.favorite ? "♥" : "♡"}
                   </motion.button>
@@ -200,22 +200,16 @@ function Watchlist() {
 
                 {/* Details */}
                 <div className="p-5 flex flex-col flex-grow">
-                  <h4
-                    className="text-lg sm:text-xl font-bold mb-1.5 line-clamp-2"
-                    style={{ color: "var(--color-text-primary)" }}
-                  >
+                  <h4 className="text-lg sm:text-xl font-bold mb-1.5 line-clamp-2" style={{ color: "var(--color-text-primary)" }}>
                     {m.title}
                   </h4>
-                  <p
-                    className="text-xs mb-4"
-                    style={{ color: "var(--color-text-secondary)" }}
-                  >
+                  <p className="text-xs mb-4" style={{ color: "var(--color-text-secondary)" }}>
                     Added on {new Date(m.createdAt).toLocaleDateString()}
                   </p>
 
-                  {/* Status Controls */}
+                  {/* Status (Movies only) OR Seasons list (TV) */}
                   <AnimatePresence mode="wait">
-                    {m.status === "planned" && (
+                    {!isTV && m.status === "planned" && (
                       <motion.button
                         key="start"
                         onClick={() => startWatching(m._id)}
@@ -227,7 +221,7 @@ function Watchlist() {
                         🎬 Start Watching
                       </motion.button>
                     )}
-                    {m.status === "watching" && (
+                    {!isTV && m.status === "watching" && (
                       <motion.button
                         key="complete"
                         onClick={() => completeWatching(m._id)}
@@ -239,7 +233,7 @@ function Watchlist() {
                         ✅ Completed
                       </motion.button>
                     )}
-                    {m.status === "completed" && (
+                    {!isTV && m.status === "completed" && (
                       <motion.p
                         key="done"
                         initial={{ opacity: 0, y: 8 }}
@@ -250,6 +244,17 @@ function Watchlist() {
                       >
                         ✔ Completed
                       </motion.p>
+                    )}
+                    {isTV && (
+                      <motion.div
+                        key="seasons"
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                      >
+                        <p className="text-sm mb-2 opacity-80">Selected seasons:</p>
+                        {renderSeasonChips(m)}
+                      </motion.div>
                     )}
                   </AnimatePresence>
 
@@ -265,7 +270,7 @@ function Watchlist() {
                     style={{
                       background: "var(--color-accent)",
                       color: "var(--color-background-primary)",
-                      borderColor: "var(--color-accent)"
+                      borderColor: "var(--color-accent)",
                     }}
                   >
                     🗑 Delete
@@ -276,11 +281,7 @@ function Watchlist() {
             ))}
           </AnimatePresence>
         ) : (
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="col-span-full text-center text-gray-500 text-xl py-10"
-          >
+          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="col-span-full text-center text-gray-500 text-xl py-10">
             No items here yet. 🚀
           </motion.p>
         )}
@@ -289,24 +290,16 @@ function Watchlist() {
   );
 
   return (
-    <div
-      className="relative min-h-screen p-6 sm:p-10 bg-[var(--color-background-primary)] dark:bg-[var(--color-background-primary)] text-[var(--color-text-primary)] dark:text-[var(--color-text-primary)]"
-    >
-      {/* Background glows */}
+    <div className="relative min-h-screen p-6 sm:p-10 bg-[var(--color-background-primary)] text-[var(--color-text-primary)]">
+      {/* Glows */}
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <div className="absolute -top-24 -right-16 h-96 w-96 rounded-full bg-red-500/20 blur-3xl" />
         <div className="absolute bottom-0 -left-24 h-[30rem] w-[30rem] rounded-full bg-purple-500/20 blur-3xl" />
       </div>
 
-      {/* Main header */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex justify-between items-center mb-10"
-      >
-        <h2 className="text-4xl sm:text-5xl font-extrabold bg-gradient-to-r from-red-400 via-rose-400 to-orange-300 bg-clip-text text-transparent">
-          🎬 Your Watchlist
-        </h2>
+      {/* Header */}
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex justify-between items-center mb-10">
+        <h2 className="text-4xl sm:text-5xl font-extrabold bg-gradient-to-r from-red-400 via-rose-400 to-orange-300 bg-clip-text text-transparent">🎬 Your Watchlist</h2>
         <motion.button
           onClick={clearWatchlist}
           whileHover={{ scale: 1.05, y: -1 }}
@@ -323,27 +316,19 @@ function Watchlist() {
         <SearchBar />
       </div>
 
-      {/* Section switcher */}
+      {/* Switcher */}
       <div className="flex justify-center mb-10">
         <div className="inline-flex rounded-full bg-gray-800/60 p-1 ring-1 ring-white/10 backdrop-blur">
           <button
             onClick={() => setActiveSection("movies")}
-            className={`px-6 py-2 rounded-full font-semibold transition ${
-              activeSection === "movies"
-                ? "bg-gradient-to-r from-red-600 to-rose-600 text-white shadow"
-                : "text-gray-300 hover:text-white hover:bg-gray-700/60"
-            }`}
+            className={`px-6 py-2 rounded-full font-semibold transition ${activeSection === "movies" ? "bg-gradient-to-r from-red-600 to-rose-600 text-white shadow" : "text-gray-300 hover:text-white hover:bg-gray-700/60"}`}
             aria-label="Show Movies"
           >
             🎥 Movies
           </button>
           <button
             onClick={() => setActiveSection("tv")}
-            className={`px-6 py-2 rounded-full font-semibold transition ${
-              activeSection === "tv"
-                ? "bg-gradient-to-r from-red-600 to-rose-600 text-white shadow"
-                : "text-gray-300 hover:text-white hover:bg-gray-700/60"
-            }`}
+            className={`px-6 py-2 rounded-full font-semibold transition ${activeSection === "tv" ? "bg-gradient-to-r from-red-600 to-rose-600 text-white shadow" : "text-gray-300 hover:text-white hover:bg-gray-700/60"}`}
             aria-label="Show TV Shows"
           >
             📺 TV Shows
@@ -351,10 +336,9 @@ function Watchlist() {
         </div>
       </div>
 
-      {/* Render active section */}
       {activeSection === "movies"
-        ? renderSection("🎥 Movies", movieFilter, setMovieFilter, filteredMovies)
-        : renderSection("📺 TV Shows", tvFilter, setTvFilter, filteredTV)}
+        ? renderSection("🎥 Movies", movieFilter, setMovieFilter, filteredMovies, false)
+        : renderSection("📺 TV Shows", tvFilter, setTvFilter, tvFiltered, true)}
     </div>
   );
 }

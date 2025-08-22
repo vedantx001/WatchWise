@@ -19,6 +19,10 @@ router.post(
     // If tmdbId is provided, it must be a string and contentType must also be present
     check("tmdbId", "TMDB ID is required for TMDB content").not().isEmpty().isString(),
     check("contentType", "Content type is required if TMDB ID is provided").isIn(["movie", "tv"]),
+    check("seasonNumber")
+      .if((value, { req }) => req.body.contentType === "tv")
+      .isInt({ min: 0 })
+      .withMessage("seasonNumber must be an integer >= 0"),
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -28,98 +32,135 @@ router.post(
     }
 
 
-    const { title, genre, duration, status, rating, posterPath, tmdbId, contentType, favorite } = req.body;
+    const { title, genre, duration, status, rating, posterPath, tmdbId, contentType, favorite, seasonNumber } = req.body;
 
     try {
-        // Check for duplicate TMDB entry for the current user if tmdbId is provided
-        const existingContent = await Movie.findOne({
-            user: req.user.id,
-            tmdbId,
-            contentType,
+        if (contentType === "movie") {
+        // ----- Handle Movie -----
+        const tmdbData = await fetchMovieDetails(tmdbId);
+
+        // Prevent duplicate movies
+        const existing = await Movie.findOne({
+          user: req.user.id,
+          tmdbId,
+          contentType: "movie",
         });
-        if (existingContent) {
-            return res.status(400).json({ msg: "This content is already in your watchlist." });
+        if (existing) {
+          return res
+            .status(400)
+            .json({ msg: "This movie is already in your watchlist." });
         }
 
-        // Fetch details from TMDB
-        let tmdbData;
-        if (contentType === "movie") {
-            tmdbData = await fetchMovieDetails(tmdbId);
-        } else if (contentType === "tv") {
-            tmdbData = await fetchTvShowDetails(tmdbId);
+        const newMovie = new Movie({
+          user: req.user.id,
+          tmdbId,
+          contentType: "movie",
+          status: status || "planned",
+          rating: rating || 0,
+          favorite: favorite || false,
+          completedDate: status === "completed" ? new Date() : null,
+          title: tmdbData.title,
+          genre: tmdbData.genres ? tmdbData.genres.map((g) => g.name) : [],
+          posterPath: tmdbData.poster_path
+            ? `${TMDB_IMAGE_BASE_URL}${tmdbData.poster_path}`
+            : null,
+          releaseDate: tmdbData.release_date,
+          language: tmdbData.original_language,
+          duration: tmdbData.runtime || 0,
+        });
+
+        const saved = await newMovie.save();
+        return res.status(201).json(saved);
+      } else if (contentType === "tv") {
+        // ----- Handle TV SEASON -----
+        if (!seasonNumber && seasonNumber !== 0) {
+          return res
+            .status(400)
+            .json({ msg: "Season number is required for TV shows" });
+        }
+
+        const tvData = await fetchTvShowDetails(tmdbId);
+        const seasonData = await fetchSeasonDetails(tmdbId, seasonNumber);
+
+        // See if the show already exists in user’s watchlist
+        let existingShow = await Movie.findOne({
+          user: req.user.id,
+          tmdbId,
+          contentType: "tv",
+        });
+
+        if (existingShow) {
+          // If season already exists, prevent duplicates
+          const alreadyAdded = existingShow.seasons.find(
+            (s) => s.seasonNumber === seasonNumber
+          );
+          if (alreadyAdded) {
+            return res
+              .status(400)
+              .json({ msg: "This season is already in your watchlist." });
+          }
+
+          // Otherwise add the season
+          existingShow.seasons.push({
+            seasonNumber,
+            title: seasonData.name || `Season ${seasonNumber}`,
+            overview: seasonData.overview,
+            episodeCount: seasonData.episodes.length,
+            posterPath: seasonData.poster_path
+              ? `${TMDB_IMAGE_BASE_URL}${seasonData.poster_path}`
+              : existingShow.posterPath,
+            status: status || "planned",
+            episodes: seasonData.episodes.map((ep) => ({
+              episodeNumber: ep.episode_number,
+              name: ep.name,
+              duration:
+                ep.runtime || tvData.episode_run_time?.[0] || 0,
+              overview: ep.overview,
+            })),
+          });
+
+          await existingShow.save();
+          return res.status(201).json(existingShow);
         } else {
-            return res.status(400).json({ msg: "Invalid content type specified." });
-        }
-
-        let newContentData = {
+          // Create new show entry with first selected season
+          const newShow = new Movie({
             user: req.user.id,
             tmdbId,
-            contentType,
-            status: status || "planned",
-            rating: rating || 0,
-            favorite: favorite || false,
-            completedDate: status === "completed" ? new Date() : null,
-            // Data mapped directly from TMDB response
-            title: tmdbData.title || tmdbData.name, // 'title' for movies, 'name' for TV shows
-            genre: tmdbData.genres ? tmdbData.genres.map(g => g.name) : [], // Extract only genre names
-            posterPath: tmdbData.poster_path ? `${TMDB_IMAGE_BASE_URL}${tmdbData.poster_path}` : null,
-            releaseDate: tmdbData.release_date || tmdbData.first_air_date, // Unified release/air date field
-            language: tmdbData.original_language || "en", // Original language from TMDB
-            inProduction: tmdbData.in_production || false, // Specific to TV shows
-        };
+            contentType: "tv",
+            title: tvData.name,
+            genre: tvData.genres ? tvData.genres.map((g) => g.name) : [],
+            posterPath: tvData.poster_path
+              ? `${TMDB_IMAGE_BASE_URL}${tvData.poster_path}`
+              : null,
+            releaseDate: tvData.first_air_date,
+            language: tvData.original_language,
+            totalSeasons: tvData.number_of_seasons,
+            inProduction: tvData.in_production,
+            seasons: [
+              {
+                seasonNumber,
+                title: seasonData.name || `Season ${seasonNumber}`,
+                overview: seasonData.overview,
+                episodeCount: seasonData.episodes.length,
+                posterPath: seasonData.poster_path
+                  ? `${TMDB_IMAGE_BASE_URL}${seasonData.poster_path}`
+                  : null,
+                status: status || "planned",
+                episodes: seasonData.episodes.map((ep) => ({
+                  episodeNumber: ep.episode_number,
+                  name: ep.name,
+                  duration:
+                    ep.runtime || tvData.episode_run_time?.[0] || 0,
+                  overview: ep.overview,
+                })),
+              },
+            ],
+          });
 
-        // Movie-Specific Fields
-        if (contentType === "movie") {
-            newContentData.duration = tmdbData.runtime || 0; // Movie runtime in minutes
+          const savedShow = await newShow.save();
+          return res.status(201).json(savedShow);
         }
-        // TV Show-Specific Fields
-        else if (contentType === "tv") {
-            newContentData.totalSeasons = tmdbData.number_of_seasons || 0;
-            newContentData.totalEpisodes = tmdbData.number_of_episodes || 0;
-
-            const seasons = [];
-            let totalCalculatedDuration = 0; // Accumulator for total show duration
-            let calculatedEpisodeCount = 0; // Accumulator for total episodes for avg duration
-
-            // Iterate through TMDB's summary seasons to fetch detailed episodes for each
-            // Filter out 'Specials' (season_number 0) if it has no episodes, to avoid unnecessary calls or empty data.
-            const relevantSeasons = tmdbData.seasons.filter(s => s.season_number !== 0 || s.episode_count > 0);
-
-            for (const tmdbSeason of relevantSeasons) {
-                const seasonDetails = await fetchSeasonDetails(tmdbId, tmdbSeason.season_number);
-                const episodes = [];
-                let seasonDuration = 0; // Accumulator for individual season duration
-
-                if (seasonDetails.episodes && seasonDetails.episodes.length > 0) {
-                    for (const tmdbEpisode of seasonDetails.episodes) {
-                        // TMDB's episode runtime can be available per-episode, or use series' average if not.
-                        const episodeDuration = tmdbEpisode.runtime || tmdbData.episode_run_time?.[0] || 0;
-                        episodes.push({
-                            episodeNumber: tmdbEpisode.episode_number,
-                            duration: episodeDuration,
-                        });
-                        seasonDuration += episodeDuration; // Add to current season's total duration
-                        totalCalculatedDuration += episodeDuration; // Add to overall show's total duration
-                        calculatedEpisodeCount++; // Increment total episodes count
-                    }
-                }
-
-                seasons.push({
-                    seasonNumber: tmdbSeason.season_number,
-                    episodeCount: seasonDetails.episodes ? seasonDetails.episodes.length : 0,
-                    duration: seasonDuration,
-                    episodes: episodes,
-                });
-            }
-            newContentData.seasons = seasons;
-            newContentData.totalDuration = totalCalculatedDuration;
-            newContentData.episodeDuration = calculatedEpisodeCount > 0 ? (totalCalculatedDuration / calculatedEpisodeCount) : 0;
-        }
-
-        const newContent = new Movie(newContentData);
-        const savedContent = await newContent.save();
-        console.log("Content added successfully: ", savedContent);
-        res.status(201).json(savedContent);
+      }
     } catch (err) {
       console.error(err.message);
       res.status(500).send("Server error");
@@ -127,73 +168,28 @@ router.post(
   }
 );
 
-router.put(
-  "/:id",
-  auth,
-  [
-    // Validation for update
-    check("title", "Title cannot be empty").optional().not().isEmpty(),
-    check("duration", "Duration must be a number").optional().isNumeric(),
-    check("rating", "Rating must be between 0 and 10").optional().isFloat({ min: 0, max: 10 }),
-    check("status", "Invalid status").optional().isIn(["planned", "watching", "completed"]),
-    check("favorite", "Favorite must be a boolean").optional().isBoolean(),
-    // No need to validate tmdbId/contentType on update as they should be immutable
-  ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+router.put("/:id", auth, async (req, res) => {
+  const { status } = req.body;
+
+  try {
+    let item = await Movie.findById(req.params.id);
+    if (!item) return res.status(404).json({ msg: "Not found" });
+
+    if (item.user.toString() !== req.user.id)
+      return res.status(401).json({ msg: "Not authorized" });
+
+    if (status) {
+      item.status = status;
+      item.completedDate = status === "completed" ? new Date() : null;
     }
 
-    const { title, genre, duration, status, rating, favorite } = req.body;
-    const updatedFields = {};
-
-    if (title) updatedFields.title = title;
-    // Handle genre update to ensure it remains an array
-    if (genre !== undefined) {
-      updatedFields.genre = Array.isArray(genre) ? genre : (genre ? genre.split(',').map(g => g.trim()) : []);
-    }
-    if (duration !== undefined) updatedFields.duration = duration;
-    if (status) updatedFields.status = status;
-    if (rating !== undefined) updatedFields.rating = rating;
-    if (favorite !== undefined) updatedFields.favorite = favorite;
-
-    // Set completedDate if status becomes 'completed'
-    if (status === "completed") {
-      updatedFields.completedDate = new Date();
-    } else if (status && status !== "completed") {
-      // If status changes from completed to something else, clear completedDate
-      updatedFields.completedDate = null;
-    }
-
-    try {
-      let movie = await Movie.findById(req.params.id);
-
-      if (!movie) {
-        return res.status(404).json({ msg: "Movie/TV show not found" });
-      }
-
-      // Ensure user owns the movie/tv show
-      if (movie.user.toString() !== req.user.id) {
-        return res.status(401).json({ msg: "User not authorized" });
-      }
-
-      movie = await Movie.findByIdAndUpdate(
-        req.params.id,
-        { $set: updatedFields },
-        { new: true } // Return the updated document
-      );
-
-      res.json(movie);
-    } catch (err) {
-      console.error(err.message);
-      if (err.kind === "ObjectId") {
-        return res.status(404).json({ msg: "Movie/TV show not found" });
-      }
-      res.status(500).send("Server error");
-    }
+    await item.save();
+    res.json(item);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
   }
-);
+});
 
 // @route   PUT api/movies/:id/favorite
 // @desc    Toggle favorite status of a movie/tv show
@@ -219,6 +215,34 @@ router.put("/:id/favorite", auth, async (req, res) => {
     if (err.kind === "ObjectId") {
       return res.status(404).json({ msg: "Movie/TV show not found" });
     }
+    res.status(500).send("Server error");
+  }
+});
+
+// UPDATE SEASON STATUS
+router.put("/:id/season/:seasonNumber", auth, async (req, res) => {
+  const { status } = req.body;
+  try {
+    const show = await Movie.findById(req.params.id);
+    if (!show || show.contentType !== "tv")
+      return res.status(404).json({ msg: "TV show not found" });
+
+    if (show.user.toString() !== req.user.id)
+      return res.status(401).json({ msg: "Not authorized" });
+
+    const season = show.seasons.find(
+      (s) => s.seasonNumber === parseInt(req.params.seasonNumber)
+    );
+    if (!season) return res.status(404).json({ msg: "Season not found" });
+
+    season.status = status;
+    if (status === "completed") season.completedDate = new Date();
+    else season.completedDate = null;
+
+    await show.save();
+    res.json(show);
+  } catch (err) {
+    console.error(err.message);
     res.status(500).send("Server error");
   }
 });

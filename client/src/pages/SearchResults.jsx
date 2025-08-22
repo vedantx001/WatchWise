@@ -109,7 +109,12 @@ export default function SearchResults() {
   }, [query, location.search, page]);
 
   const handleCardClick = (item) => {
-    navigate(`/details/${item.media_type}/${item.id}`);
+    if (item.media_type === "movie") {
+      navigate(`/details/movie/${item.id}`);
+    } else {
+      // navigate to show details where user can pick seasons
+      navigate(`/details/tv/${item.id}`);
+    }
   };
 
   const renderPagination = () => {
