@@ -34,8 +34,8 @@ router.post(
 
     const { title, genre, duration, status, rating, posterPath, tmdbId, contentType, favorite, seasonNumber } = req.body;
 
-    try {
-        if (contentType === "movie") {
+  try {
+    if (contentType === "movie") {
         // ----- Handle Movie -----
         const tmdbData = await fetchMovieDetails(tmdbId);
 
@@ -162,8 +162,8 @@ router.post(
         }
       }
     } catch (err) {
-      console.error(err.message);
-      res.status(500).send("Server error");
+  console.error("POST /api/movies error:", err);
+  res.status(500).send("Server error: " + err.message);
     }
   }
 );

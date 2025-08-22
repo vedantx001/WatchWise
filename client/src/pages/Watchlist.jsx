@@ -1,4 +1,4 @@
-// src/pages/Watchlist.jsx (or wherever it lives)
+
 import { useEffect, useState, Fragment } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import api from "../api";
@@ -88,6 +88,17 @@ function Watchlist() {
     return has(tvFilter);
   });
 
+  // --- Season status handlers must be above renderSeasonChips for scope ---
+  const startWatchingSeason = async (showId, seasonNumber) => {
+    const res = await api.put(`/movies/${showId}/season/${seasonNumber}`, { status: "watching" });
+    setItems((prev) => prev.map((m) => m._id === showId ? withPosterUrl(res.data) : m));
+  };
+
+  const completeSeason = async (showId, seasonNumber) => {
+    const res = await api.put(`/movies/${showId}/season/${seasonNumber}`, { status: "completed" });
+    setItems((prev) => prev.map((m) => m._id === showId ? withPosterUrl(res.data) : m));
+  };
+
   const renderSeasonChips = (show) => {
     const seasons = show.seasons || [];
     if (!seasons.length) {
@@ -96,9 +107,8 @@ function Watchlist() {
     return (
       <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
         {seasons.map((s) => (
-          <button
+          <div
             key={s.seasonNumber}
-            onClick={() => navigate(`/details/tv/${show.tmdbId}/season/${s.seasonNumber}`)}
             className={`w-full text-left px-3 py-2 rounded-lg border transition 
               ${s.status === "completed" ? "border-green-500/60" :
                 s.status === "watching" ? "border-yellow-500/60" : "border-white/10"} 
@@ -106,13 +116,31 @@ function Watchlist() {
             title={`Open Season ${s.seasonNumber}`}
           >
             <div className="flex items-center justify-between">
-              <span className="font-semibold">Season {s.seasonNumber}</span>
+              <span className="font-semibold cursor-pointer" onClick={() => navigate(`/details/tv/${show.tmdbId}/season/${s.seasonNumber}`)}>
+                Season {s.seasonNumber}
+              </span>
               <span className="text-xs opacity-80">{s.episodeCount} eps</span>
             </div>
-            <div className="text-xs mt-1 opacity-80">
+            <div className="text-xs mt-1 opacity-80 mb-2">
               {s.status === "completed" ? "✅ Completed" : s.status === "watching" ? "⏳ Watching" : "📝 Planned"}
             </div>
-          </button>
+            {s.status === "planned" && (
+              <button
+                onClick={() => startWatchingSeason(show._id, s.seasonNumber)}
+                className="px-3 py-1 text-xs rounded bg-purple-600 hover:bg-purple-500 text-white font-semibold shadow mr-2 mb-1"
+              >
+                🎬 Start Watching
+              </button>
+            )}
+            {s.status === "watching" && (
+              <button
+                onClick={() => completeSeason(show._id, s.seasonNumber)}
+                className="px-3 py-1 text-xs rounded bg-blue-600 hover:bg-blue-500 text-white font-semibold shadow mr-2 mb-1"
+              >
+                ✅ Completed
+              </button>
+            )}
+          </div>
         ))}
       </div>
     );

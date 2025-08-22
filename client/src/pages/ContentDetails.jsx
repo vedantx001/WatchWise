@@ -102,19 +102,22 @@ export default function ContentDetails() {
                 <div className="mt-auto pt-6">
                   <button
                     onClick={async () => {
-                      await api.post(
-                        "/movies",
-                        {
-                          title: show.title,
-                          tmdbId: String(show.id),
-                          contentType: "movie",
-                          status: "planned",
-                          rating: show.vote_average || 0,
-                          posterPath: poster,
-                        },
-                        { headers: { "x-auth-token": localStorage.getItem("token") || "" } }
-                      );
-                      alert(`${show.title} added to watchlist!`);
+                      try {
+                        await api.post(
+                          "/movies",
+                          {
+                            title: show.title,
+                            tmdbId: String(show.id),
+                            contentType: "movie",
+                            status: "planned",
+                            rating: show.vote_average || 0,
+                          }
+                        );
+                        alert(`${show.title} added to watchlist!`);
+                      } catch (err) {
+                        const msg = err?.response?.data?.msg || err?.response?.data?.errors?.[0]?.msg || err.message;
+                        alert(`Failed to add: ${msg}`);
+                      }
                     }}
                     className="w-full md:w-auto bg-red-600 text-white font-bold px-8 py-3 rounded-lg shadow-lg hover:bg-red-700 transition"
                   >
