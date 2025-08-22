@@ -22,6 +22,7 @@ function App() {
         </Route>
         <Route element={<Layout />}>
           <Route path="/" element={<Landing />} />
+          <Route path="/search" element={<SearchResults />} />
           <Route path="/search/:query" element={<SearchResults />} />
           <Route path="/trending" element={<Trending />} />
           <Route path="/details/:type/:id" element={<ContentDetails />} />

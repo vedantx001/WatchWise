@@ -1,23 +1,29 @@
 /* src/styles/search.css */
 
-/* Search Bar Container */
+/* Search Bar */
 .search-bar {
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 20px auto;
-  max-width: 600px;
-  width: 90%;
+  max-width: 680px;
+  width: 92%;
   background-color: var(--color-background-secondary);
-  border-radius: 5px;
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 4px 15px rgba(44,44,44,0.15);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 6px 20px rgba(44, 44, 44, 0.08);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
-/* Search Input */
+.search-bar:focus-within {
+  box-shadow: 0 6px 24px rgba(26, 188, 156, 0.18);
+  border-color: var(--color-accent);
+}
+
 .search-bar input {
   flex: 1;
-  padding: 12px 18px;
+  padding: 12px 16px 12px 18px;
   font-size: 16px;
   color: var(--color-text-primary);
   background: transparent;
@@ -29,52 +35,127 @@
   color: var(--color-text-secondary);
 }
 
-/* Search Button */
 .search-bar button {
-  padding: 12px 20px;
+  padding: 12px 18px;
   background: var(--color-accent);
   color: var(--color-background-primary);
-  font-size: 16px;
-  font-weight: bold;
+  font-size: 15px;
+  font-weight: 700;
   border: none;
   cursor: pointer;
-  transition: background 0.3s ease;
+  transition: transform 0.08s ease, filter 0.2s ease, background 0.2s ease;
 }
 
 .search-bar button:hover {
-  background: var(--color-accent);
+  filter: brightness(1.05);
 }
 
+.search-bar button:active {
+  transform: scale(0.98);
+}
+
+/* Page container */
 .search-results {
   padding: 20px;
   color: var(--color-text-primary);
-  background: linear-gradient(to bottom right, var(--color-background-primary), var(--color-background-secondary));
+  background: linear-gradient(135deg,
+      var(--color-background-primary) 0%,
+      var(--color-background-secondary) 100%);
   min-height: 100vh;
 }
 
 .search-results h2 {
   font-size: 1.8rem;
-  margin-bottom: 20px;
-  font-weight: bold;
+  margin-bottom: 18px;
+  font-weight: 800;
   text-align: center;
+  letter-spacing: 0.25px;
+  color: var(--color-text-primary);
 }
 
+/* Loading + empty state */
+.loading,
+.empty-state {
+  display: grid;
+  place-items: center;
+  color: var(--color-text-secondary);
+  margin: 10px 0 18px;
+  min-height: 72px;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--color-background-secondary);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+  border: 0;
+  padding: 0;
+  margin: -1px;
+}
+
+/* Grid */
 .results-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 1.2rem;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 1.1rem;
+  margin-top: 6px;
 }
 
+/* Card */
 .result-card {
-  background: var(--color-background-secondary, rgba(255,255,255,0.05));
+  background: var(--color-background-secondary, rgba(255, 255, 255, 0.05));
   border-radius: 12px;
   overflow: hidden;
   text-align: center;
   padding-bottom: 10px;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   position: relative;
+  cursor: pointer;
 }
 
+.result-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0px 8px 20px rgba(255, 255, 255, 0.1);
+}
+
+.result-card:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Poster */
+.poster-wrap {
+  position: relative;
+  aspect-ratio: 2/3;
+  background: var(--color-background-primary);
+}
+
+.poster-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Fallback if you don’t use .poster-wrap in markup */
 .result-card img {
   width: 100%;
   height: 225px;
@@ -83,7 +164,13 @@
   border-bottom: 2px solid rgba(255, 255, 255, 0.1);
 }
 
-.result-card p {
+/* Card body */
+.card-body {
+  padding: 10px 10px 8px;
+}
+
+.result-card p,
+.title {
   margin-top: 10px;
   font-weight: 500;
   font-size: 0.95rem;
@@ -91,6 +178,17 @@
   color: var(--color-text-primary);
 }
 
+.meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 8px;
+  margin-top: 6px;
+}
+
+/* Tags */
+.type-tag,
 .result-card .type-tag {
   display: inline-block;
   background: var(--color-accent);
@@ -101,6 +199,7 @@
   margin-top: 5px;
 }
 
+.rating,
 .result-card .rating {
   display: block;
   margin-top: 4px;
@@ -108,14 +207,87 @@
   color: var(--color-accent);
 }
 
-.result-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0px 8px 20px rgba(255, 255, 255, 0.1);
+/* Bottom-only Pagination */
+.custom-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 16px 0 8px;
+  flex-wrap: wrap;
+}
+
+/* If your JSX uses className="page-btn" */
+.page-btn,
+.custom-pagination>button {
+  min-width: 44px;
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: var(--color-background-secondary);
+  color: var(--color-text-primary);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  font-weight: 800;
+  font-size: 0.95rem;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
+  cursor: pointer;
+}
+
+.page-btn:hover:not(:disabled),
+.custom-pagination>button:hover:not(:disabled) {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.page-btn.is-active,
+.custom-pagination>button.is-active {
+  background: var(--color-accent);
+  color: var(--color-background-primary);
+  border-color: var(--color-accent);
+  cursor: default;
+}
+
+.page-btn:disabled,
+.custom-pagination>button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.page-btn:active:not(:disabled),
+.custom-pagination>button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.page-btn:focus-visible,
+.custom-pagination>button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.dots {
+  color: var(--color-text-secondary);
+  padding: 0 4px;
 }
 
 /* Mobile tweaks */
 @media (max-width: 600px) {
   .results-grid {
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1rem;
+  }
+}
+
+/* Motion preference */
+@media (prefers-reduced-motion: reduce) {
+
+  .result-card,
+  .search-bar button,
+  .page-btn,
+  .custom-pagination>button {
+    transition: none;
+  }
+
+  .spinner {
+    animation: none;
   }
 }

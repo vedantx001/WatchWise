@@ -1,5 +1,7 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { motion, AnimatePresence, useScroll, useSpring } from "framer-motion";
+import { Layers } from "lucide-react";
 import {
   MagnifyingGlassIcon,
   SunIcon,
@@ -9,40 +11,83 @@ import {
   HomeIcon,
   UserIcon,
   UserPlusIcon,
-  StarIcon
+  StarIcon,
+  RectangleStackIcon,
 } from "@heroicons/react/24/outline";
 import SearchBar from "./SearchBar";
-
+import GenreSearch from "./GenreSearch";
 
 function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [scrolled, setScrolled] = useState(false);
-  // Default theme is dark unless user has set preference in localStorage
+
+  // Theme: default dark, persisted
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    const stored = localStorage.getItem('theme');
-    if (stored === 'light') return false;
-    return true;
+    const stored = localStorage.getItem("theme");
+    return stored ? stored === "dark" : true;
   });
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [genreModalOpen, setGenreModalOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
+  // Scroll progress bar
+  const { scrollYProgress } = useScroll();
+  const progress = useSpring(scrollYProgress, {
+    stiffness: 120,
+    damping: 30,
+    mass: 0.2,
+  });
+
+  // Monitor auth token + theme + scroll
   useEffect(() => {
-    // Check if user is logged in
-    const token = localStorage.getItem("token");
-    setIsLoggedIn(!!token);
+    const checkToken = () => setIsLoggedIn(!!localStorage.getItem("token"));
+    checkToken();
 
-    // Apply theme
+    const onStorage = (e) => {
+      if (e.key === "token") checkToken();
+    };
+    window.addEventListener("storage", onStorage);
+
+    const onScroll = () => setScrolled(window.scrollY > 6);
+    onScroll();
+    window.addEventListener("scroll", onScroll);
+
+    // Apply theme to html
     if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("theme", "dark");
     } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
     }
-  }, [isDarkMode]);
+
+    // Keyboard shortcuts
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setIsSearchOpen((v) => !v);
+      }
+      if (e.key === "/" && !isSearchOpen) {
+        e.preventDefault();
+        setIsSearchOpen(true);
+      }
+      if (e.key === "Escape") {
+        setIsSearchOpen(false);
+        setGenreModalOpen(false);
+        setIsMobileMenuOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [isDarkMode, isSearchOpen]);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -50,202 +95,255 @@ function Navbar() {
     navigate("/login");
   };
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
-      setSearchQuery("");
-      setIsSearchOpen(false);
-    }
-  };
-
-  const toggleTheme = () => {
-    setIsDarkMode(!isDarkMode);
-  };
-
-  const navItems = [
-    { name: "Home", path: "/", icon: HomeIcon },
-    { name: "Watchlist", path: "/watchlist", icon: Bars3Icon },
-    { name: "Dashboard", path: "/dashboard", icon: UserIcon },
-    { name: "Trending", path: "/trending", icon: StarIcon},
-  ];
+  const navItems = useMemo(
+    () => [
+      { name: "Home", path: "/", icon: HomeIcon },
+      { name: "Watchlist", path: "/watchlist", icon: RectangleStackIcon },
+      { name: "Dashboard", path: "/dashboard", icon: UserIcon },
+      { name: "Trending", path: "/trending", icon: StarIcon },
+    ],
+    []
+  );
 
   const isActive = (path) => location.pathname === path;
 
   return (
     <>
-      {/* Search Modal Overlay (full page) */}
-      {isSearchOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-          style={{ minHeight: '100vh' }}
-        >
-          <div className="w-full max-w-xl mx-auto px-4">
-            <SearchBar onClose={() => setIsSearchOpen(false)} />
-          </div>
-        </div>
-      )}
+      {/* Scroll progress bar */}
+      <motion.div
+        style={{ scaleX: progress }}
+        className="fixed top-0 left-0 right-0 origin-left h-0.5 z-[60]"
+      >
+        <div className="w-full h-full bg-[color:var(--color-accent)]" />
+      </motion.div>
 
-      <nav className={`bg-[var(--color-background-primary)] dark:bg-[var(--color-background-primary)] 
-        fixed top-0 left-0 right-0 z-50
-        ${isDarkMode ? 'bg-gray-900/95' : 'bg-white/95'} 
-        backdrop-blur-md border-b 
-        ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}
-        transition-all duration-300 ease-in-out
-
-      `}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            {/* Logo & Brand */}
-            <div
-              className="flex items-center space-x-2 cursor-pointer group"
-              onClick={() => navigate("/")}
+      {/* Search Overlay */}
+      <AnimatePresence>
+        {isSearchOpen && (
+          <motion.div
+            key="search-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            aria-modal
+            role="dialog"
+          >
+            <motion.div
+              initial={{ scale: 0.98, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.98, opacity: 0 }}
+              className="w-full max-w-xl"
             >
-              <div className="relative">
-                <div className={`
-                  w-10 h-10 rounded-xl flex items-center justify-center
-                  bg-gradient-to-br from-red-500 to-red-600
-                  shadow-lg group-hover:shadow-red-500/25
-                  transform group-hover:scale-105 transition-all duration-300
-                `}>
-                  <span className="text-white font-bold text-lg">W</span>
-                </div>
-                <div className="absolute -inset-1 bg-gradient-to-br from-red-500 to-red-600 rounded-xl blur opacity-25 group-hover:opacity-40 transition-opacity duration-300"></div>
-              </div>
-              <h1 className={`
-                text-2xl font-bold bg-gradient-to-r from-red-500 to-red-600 
-                bg-clip-text text-transparent
-                group-hover:from-red-400 group-hover:to-red-500
-                transition-all duration-300
-              `}>
-                WatchWise
-              </h1>
-            </div>
+              <SearchBar onClose={() => setIsSearchOpen(false)} />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-            {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center space-x-8">
-              {navItems.map((item) => {
-                const Icon = item.icon;
+      {/* Navbar */}
+      <motion.nav
+        initial={false}
+        animate={{
+          y: scrolled ? -2 : 0,
+          boxShadow: scrolled
+            ? isDarkMode
+              ? "0 8px 30px rgba(0,0,0,0.35)"
+              : "0 8px 30px rgba(0,0,0,0.10)"
+            : "0 0 0 rgba(0,0,0,0)",
+        }}
+        transition={{ type: "spring", stiffness: 220, damping: 28 }}
+        className="fixed top-0 left-0 right-0 z-[65] backdrop-blur-md border-b"
+        style={{
+          background:
+            "color-mix(in srgb, var(--color-background-primary) 85%, transparent)",
+          borderColor: "color-mix(in srgb, var(--color-text-secondary) 15%, transparent)",
+        }}
+      >
+        <div className="mx-auto max-w-7xl px-4 md:px-8">
+          <div className="flex h-16 items-center justify-between">
+            {/* Brand */}
+            <button
+              onClick={() => navigate("/")}
+              className="relative group flex items-center gap-2 cursor-pointer"
+              aria-label="Go to home"
+            >
+              <span className="relative inline-flex items-center justify-center w-10 h-10 rounded-xl transition-transform duration-300 group-hover:scale-105">
+                <span
+                  className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                  style={{
+                    background:
+                      "radial-gradient(120px 60px at 30% 30%, color-mix(in srgb, var(--color-accent) 35%, transparent), transparent)",
+                  }}
+                />
+                <span
+                  className="relative z-10 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg"
+                  style={{ backgroundColor: "var(--color-accent)" }}
+                >
+                  <span className="text-white font-bold text-lg">W</span>
+                </span>
+              </span>
+              <span
+                className="text-2xl font-extrabold tracking-tight"
+                style={{
+                  backgroundImage:
+                    "linear-gradient(90deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 70%, transparent))",
+                  WebkitBackgroundClip: "text",
+                  backgroundClip: "text",
+                  color: "transparent",
+                }}
+              >
+                WatchWise
+              </span>
+            </button>
+
+            {/* Desktop Nav */}
+            <div className="hidden md:flex items-center gap-2">
+              {navItems.map(({ path, name, icon: Icon }) => {
+                const active = isActive(path);
                 return (
-                  <button
-                    key={item.name}
-                    onClick={() => navigate(item.path)}
-                    className={`
-                      flex items-center space-x-2 px-4 py-2 rounded-lg
-                      transition-all duration-300 relative group
-                      ${isActive(item.path)
-                        ? `${isDarkMode ? 'text-red-400 bg-red-500/10' : 'text-red-600 bg-red-50'}`
-                        : `${isDarkMode ? 'text-gray-300 hover:text-white hover:bg-gray-800' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'}`
-                      }
-                    `}
+                  <motion.button
+                    key={name}
+                    onClick={() => navigate(path)}
+                    className="relative group px-3 py-2 rounded-lg flex items-center gap-2 font-medium transition-all cursor-pointer"
+                    whileHover={{ y: -1 }}
+                    style={{
+                      color: active
+                        ? "var(--color-accent)"
+                        : "var(--color-text-secondary)",
+                    }}
                   >
-                    <Icon className="w-5 h-5" />
-                    <span className="font-medium">{item.name}</span>
-                    {isActive(item.path) && (
-                      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-red-500 rounded-full"></div>
+                    {active && (
+                      <motion.span
+                        layoutId="nav-active-bg"
+                        className="absolute inset-0 rounded-lg -z-10"
+                        style={{
+                          background:
+                            "color-mix(in srgb, var(--color-accent) 14%, transparent)",
+                          border: "1px solid color-mix(in srgb, var(--color-accent) 35%, transparent)",
+                        }}
+                        transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                      />
                     )}
-                  </button>
+
+                    <Icon className="w-5 h-5" />
+                    <span>{name}</span>
+
+                    {/* Underline hover */}
+                    <span
+                      className="pointer-events-none absolute left-3 right-3 -bottom-[3px] h-px scale-x-0 origin-left transition-transform duration-300 group-hover:scale-x-100"
+                      style={{ backgroundColor: "var(--color-accent)" }}
+                    />
+                  </motion.button>
                 );
               })}
             </div>
 
-            {/* Search, Theme Toggle & Auth Buttons */}
-            <div className="flex items-center space-x-4">
-
+            {/* Right Tools */}
+            <div className="flex items-center gap-2">
               {/* Search */}
-              <div className="relative">
-                <button
-                  onClick={() => setIsSearchOpen((prev) => !prev)}
-                  className={`
-                    p-2 rounded-lg transition-all duration-300
-                    ${isDarkMode
-                      ? 'hover:bg-gray-800 text-gray-400 hover:text-white'
-                      : 'hover:bg-gray-100 text-gray-600 hover:text-gray-900'
-                    }
-                    hover:scale-110
-                  `}
-                  aria-label={isSearchOpen ? 'Close search' : 'Open search'}
-                >
-                  <MagnifyingGlassIcon className="w-5 h-5" />
-                </button>
-              </div>
+              <motion.button
+                onClick={() => setIsSearchOpen(true)}
+                whileTap={{ scale: 0.96 }}
+                className="relative p-2 rounded-lg transition-colors cursor-pointer"
+                style={{
+                  color: "var(--color-text-secondary)",
+                }}
+                aria-label="Open search (Ctrl/Cmd + K)"
+                title="Search (Ctrl/Cmd + K)"
+              >
+                <span className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity" />
+                <MagnifyingGlassIcon className="w-5 h-5" />
+              </motion.button>
+
+              {/* Genre */}
+              <motion.button
+                onClick={() => setGenreModalOpen(true)}
+                whileHover={{ scale: 1.06 }}
+                whileTap={{ scale: 0.95 }}
+                className="relative p-2 rounded-lg transition-colors cursor-pointer"
+                style={{ color: "var(--color-text-secondary)" }}
+                aria-label="Search by genre"
+                title="Search by genre"
+              >
+                <span
+                  className="absolute inset-0 rounded-lg opacity-0 transition-opacity"
+                  style={{
+                    background:
+                      "linear-gradient(90deg, color-mix(in srgb, var(--color-accent) 12%, transparent), transparent)",
+                  }}
+                />
+                <Layers size={20} />
+              </motion.button>
+
+              <GenreSearch
+                open={genreModalOpen}
+                onClose={() => setGenreModalOpen(false)}
+                onSearch={({ movieGenres, tvGenres }) => {
+                  const params = new URLSearchParams();
+                  if (movieGenres && movieGenres.length)
+                    params.set('movieGenres', movieGenres.join(','));
+                  if (tvGenres && tvGenres.length)
+                    params.set('tvGenres', tvGenres.join(','));
+                  navigate(`/search?${params.toString()}`);
+                  setGenreModalOpen(false);
+                }}
+              />
 
               {/* Theme Toggle */}
-              <button
-                onClick={toggleTheme}
-                className={`
-                  p-2 rounded-lg transition-all duration-300
-                  ${isDarkMode
-                    ? 'hover:bg-gray-800 text-yellow-400 hover:text-yellow-300'
-                    : 'hover:bg-gray-100 text-gray-600 hover:text-gray-900'
-                  }
-                  hover:scale-110 hover:rotate-12
-                `}
+              <motion.button
+                onClick={() => setIsDarkMode((v) => !v)}
+                whileTap={{ rotate: 20, scale: 0.96 }}
+                className="p-2 rounded-lg cursor-pointer"
+                aria-label="Toggle theme"
+                title="Toggle theme"
+                style={{ color: "var(--color-text-secondary)" }}
               >
                 {isDarkMode ? (
-                  <SunIcon className="w-5 h-5" />
+                  <SunIcon className="w-5 h-5 text-yellow-400" />
                 ) : (
                   <MoonIcon className="w-5 h-5" />
                 )}
-              </button>
+              </motion.button>
 
-              {/* Auth Buttons */}
-              <div className="hidden md:flex items-center space-x-3">
-                {isLoggedIn ? (
+              {/* Auth */}
+              {isLoggedIn ? (
+                <motion.button
+                  onClick={handleLogout}
+                  whileHover={{ y: -1 }}
+                  whileTap={{ scale: 0.97 }}
+                  className="hidden md:inline-flex px-3 py-2 rounded-lg font-medium text-white shadow-md transition-colors cursor-pointer"
+                  style={{ backgroundColor: "var(--color-accent)" }}
+                >
+                  Logout
+                </motion.button>
+              ) : (
+                <>
                   <button
-                    onClick={handleLogout}
-                    className={`
-                      px-4 py-2 rounded-lg font-medium transition-all duration-300
-                      bg-gradient-to-r from-red-500 to-red-600 text-white
-                      hover:from-red-600 hover:to-red-700 hover:shadow-lg hover:shadow-red-500/25
-                      transform hover:scale-105 active:scale-95
-                    `}
+                    onClick={() => navigate("/login")}
+                    className="px-3 py-2 rounded-lg font-medium transition-colors cursor-pointer"
+                    style={{ color: "var(--color-text-secondary)" }}
                   >
-                    Logout
+                    Login
                   </button>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => navigate("/login")}
-                      className={`
-                        flex items-center space-x-2 px-4 py-2 rounded-lg font-medium
-                        transition-all duration-300
-                        ${isDarkMode
-                          ? 'text-gray-300 hover:text-white hover:bg-gray-800'
-                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                        }
-                        hover:scale-105 active:scale-95
-                      `}
-                    >
-                      <UserIcon className="w-4 h-4" />
-                      <span>Login</span>
-                    </button>
-                    <button
-                      onClick={() => navigate("/signup")}
-                      className={`
-                        flex items-center space-x-2 px-4 py-2 rounded-lg font-medium
-                        bg-gradient-to-r from-red-500 to-red-600 text-white
-                        hover:from-red-600 hover:to-red-700 hover:shadow-lg hover:shadow-red-500/25
-                        transform hover:scale-105 active:scale-95 transition-all duration-300
-                      `}
-                    >
-                      <UserPlusIcon className="w-4 h-4" />
-                      <span>Sign Up</span>
-                    </button>
-                  </>
-                )}
-              </div>
+                  <motion.button
+                    onClick={() => navigate("/signup")}
+                    whileHover={{ y: -1 }}
+                    whileTap={{ scale: 0.97 }}
+                    className="px-3 py-2 rounded-lg font-medium text-white shadow-md cursor-pointer"
+                    style={{ backgroundColor: "var(--color-accent)" }}
+                  >
+                    Sign Up
+                  </motion.button>
+                </>
+              )}
 
-              {/* Mobile Menu Button */}
+              {/* Mobile Menu Toggle */}
               <button
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className={`
-                  md:hidden p-2 rounded-lg transition-all duration-300
-                  ${isDarkMode
-                    ? 'hover:bg-gray-800 text-gray-400 hover:text-white'
-                    : 'hover:bg-gray-100 text-gray-600 hover:text-gray-900'
-                  }
-                `}
+                onClick={() => setIsMobileMenuOpen((v) => !v)}
+                className="md:hidden p-2 rounded-lg transition-colors cursor-pointer"
+                style={{ color: "var(--color-text-secondary)" }}
+                aria-label="Toggle menu"
               >
                 {isMobileMenuOpen ? (
                   <XMarkIcon className="w-6 h-6" />
@@ -258,93 +356,96 @@ function Navbar() {
         </div>
 
         {/* Mobile Menu */}
-        <div className={`
-          md:hidden transition-all duration-300 ease-in-out overflow-hidden
-          ${isMobileMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}
-          ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}
-          border-t
-        `}>
-          <div className="px-4 py-4 space-y-3">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.name}
-                  onClick={() => {
-                    navigate(item.path);
-                    setIsMobileMenuOpen(false);
+        <AnimatePresence>
+          {isMobileMenuOpen && (
+            <motion.div
+              key="mobile-menu"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="md:hidden overflow-hidden border-t"
+              style={{
+                backgroundColor: "var(--color-background-primary)",
+                borderColor: "color-mix(in srgb, var(--color-text-secondary) 15%, transparent)",
+              }}
+            >
+              <div className="px-4 py-4 flex flex-col gap-2">
+                {navItems.map(({ name, path, icon: Icon }, idx) => (
+                  <motion.button
+                    key={name}
+                    onClick={() => {
+                      navigate(path);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    initial={{ x: -8, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    transition={{ delay: 0.05 * idx }}
+                    className="relative flex items-center gap-3 px-3 py-3 rounded-lg text-left cursor-pointer"
+                    style={{
+                      color: isActive(path)
+                        ? "var(--color-accent)"
+                        : "var(--color-text-secondary)",
+                      background: isActive(path)
+                        ? "color-mix(in srgb, var(--color-accent) 12%, transparent)"
+                        : "transparent",
+                      border: isActive(path)
+                        ? "1px solid color-mix(in srgb, var(--color-accent) 28%, transparent)"
+                        : "1px solid transparent",
+                    }}
+                  >
+                    <Icon className="w-5 h-5" />
+                    <span className="font-medium">{name}</span>
+                  </motion.button>
+                ))}
+
+                <div
+                  className="mt-2 pt-3"
+                  style={{
+                    borderTop:
+                      "1px solid color-mix(in srgb, var(--color-text-secondary) 15%, transparent)",
                   }}
-                  className={`
-                    flex items-center space-x-3 w-full px-4 py-3 rounded-lg
-                    transition-all duration-300
-                    ${isActive(item.path)
-                      ? `${isDarkMode ? 'text-red-400 bg-red-500/10' : 'text-red-600 bg-red-50'}`
-                      : `${isDarkMode ? 'text-gray-300 hover:text-white hover:bg-gray-800' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'}`
-                    }
-                  `}
                 >
-                  <Icon className="w-5 h-5" />
-                  <span className="font-medium">{item.name}</span>
-                </button>
-              );
-            })}
+                  {isLoggedIn ? (
+                    <button
+                      onClick={handleLogout}
+                      className="w-full px-4 py-3 rounded-lg font-medium text-white cursor-pointer"
+                      style={{ backgroundColor: "var(--color-accent)" }}
+                    >
+                      Logout
+                    </button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          navigate("/login");
+                          setIsMobileMenuOpen(false);
+                        }}
+                        className="flex-1 px-4 py-3 rounded-lg font-medium cursor-pointer"
+                        style={{ color: "var(--color-text-secondary)" }}
+                      >
+                        Login
+                      </button>
+                      <button
+                        onClick={() => {
+                          navigate("/signup");
+                          setIsMobileMenuOpen(false);
+                        }}
+                        className="flex-1 px-4 py-3 rounded-lg font-medium text-white cursor-pointer"
+                        style={{ backgroundColor: "var(--color-accent)" }}
+                      >
+                        Sign Up
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.nav>
 
-            <div className="pt-3 border-t border-gray-700 space-y-3">
-              {isLoggedIn ? (
-                <button
-                  onClick={handleLogout}
-                  className={`
-                    w-full px-4 py-3 rounded-lg font-medium
-                    bg-gradient-to-r from-red-500 to-red-600 text-white
-                    hover:from-red-600 hover:to-red-700
-                    transition-all duration-300
-                  `}
-                >
-                  Logout
-                </button>
-              ) : (
-                <>
-                  <button
-                    onClick={() => {
-                      navigate("/login");
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className={`
-                      flex items-center space-x-3 w-full px-4 py-3 rounded-lg font-medium
-                      ${isDarkMode
-                        ? 'text-gray-300 hover:text-white hover:bg-gray-800'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                      }
-                      transition-all duration-300
-                    `}
-                  >
-                    <UserIcon className="w-5 h-5" />
-                    <span>Login</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      navigate("/signup");
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className={`
-                      flex items-center space-x-3 w-full px-4 py-3 rounded-lg font-medium
-                      bg-gradient-to-r from-red-500 to-red-600 text-white
-                      hover:from-red-600 hover:to-red-700
-                      transition-all duration-300
-                    `}
-                  >
-                    <UserPlusIcon className="w-5 h-5" />
-                    <span>Sign Up</span>
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* Spacer to prevent content from going under fixed navbar */}
-      <div className="h-16"></div>
+      {/* Spacer */}
+      <div className="h-16" />
     </>
   );
 }
