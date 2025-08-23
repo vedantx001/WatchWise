@@ -11,6 +11,7 @@ import SearchResults from "./pages/SearchResults";
 import ContentDetails from "./pages/ContentDetails";
 import SeasonDetails from "./pages/SeasonDetails";
 
+
 function App() {
   return (
     <Router>
