@@ -635,4 +635,43 @@ router.get("/stats", auth, async (req, res) => {
     }
 });
 
+router.get("/by-tmdb/:tmdbId", auth, async (req, res) => {
+  try {
+    const item = await Movie.findOne({
+      user: req.user.id,
+      tmdbId: req.params.tmdbId,
+      contentType: "tv", // or "movie" depending on file
+    });
+
+    if (!item) return res.status(404).json({ msg: "Not found" });
+    res.json(item);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
+  }
+});
+
+// @route   GET api/movies/by-tmdb/:tmdbId
+// @desc    Get a movie in watchlist by TMDB id
+// @access  Private
+router.get("/by-tmdb/:tmdbId", auth, async (req, res) => {
+  try {
+    const movie = await Movie.findOne({
+      user: req.user.id,
+      tmdbId: req.params.tmdbId,
+      contentType: "movie",
+    });
+
+    if (!movie) {
+      return res.status(404).json({ msg: "Movie not found" });
+    }
+
+    res.json(movie);
+  } catch (err) {
+    console.error("GET /by-tmdb/:tmdbId error:", err.message);
+    res.status(500).send("Server error");
+  }
+});
+
+
 module.exports = router;

@@ -1,67 +1,139 @@
-/* Styling for the backdrop image and gradient overlay */
+/* Backdrop base */
 .backdrop-container {
-    position: relative;
-    background-size: cover;
-    background-position: center;
-    color: var(--color-text-primary);
+position: relative;
+background-size: cover;
+background-position: center;
+background-repeat: no-repeat;
+min-height: 100vh;
+color: var(--color-text-primary, #fff);
 }
 
 .backdrop-overlay {
-    /* Creates a dark gradient from bottom to top for text readability */
-    background: linear-gradient(to top, var(--color-background-primary) 25%, var(--color-background-secondary) 100%);
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+background: linear-gradient(
+to top,
+var(--color-background-primary, rgba(0,0,0,0.92)) 25%,
+var(--color-background-secondary, rgba(0,0,0,0.6)) 100%
+);
+position: absolute;
+inset: 0;
 }
 
-/* Glassmorphism effect for the main content card */
+/* Glassmorphism */
 .glass-card {
-    /* Fallback for browsers that don't support backdrop-filter */
-    background-color: var(--color-background-secondary, rgba(26, 26, 26, 0.6));
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: blur(10px);
-    border: 1px solid var(--color-text-secondary, rgba(255,255,255,0.1));
+background-color: var(--color-background-secondary, rgba(26, 26, 26, 0.6));
+-webkit-backdrop-filter: blur(10px);
+backdrop-filter: blur(10px);
+border: 1px solid var(--color-text-secondary, rgba(255,255,255,0.1));
 }
 
-/* Animated progress circle for rating */
+/* Rating circle */
 .rating-circle {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    background-color: var(--color-background-primary, rgba(0,0,0,0.7));
-    cursor: pointer;
+position: relative;
+display: inline-flex;
+align-items: center;
+justify-content: center;
+width: 60px;
+height: 60px;
+border-radius: 50%;
+background-color: var(--color-background-primary, rgba(0,0,0,0.7));
+cursor: default;
 }
 
 .rating-circle svg {
-    position: absolute;
-    top: 0;
-    left: 0;
-    transform: rotate(-90deg); /* Start the circle from the top */
+position: absolute;
+top: 0;
+left: 0;
+transform: rotate(-90deg);
 }
 
 .rating-circle circle {
-    fill: none;
-    stroke-width: 5;
-    stroke-linecap: round;
-    transition: stroke-dashoffset 1.5s ease-out; /* Animation */
+fill: none;
+stroke-width: 5;
+stroke-linecap: round;
+transition: stroke-dashoffset 1.2s ease-out;
 }
 
 .rating-circle .circle-bg {
-    stroke: var(--color-text-secondary, rgba(255,255,255,0.2));
+stroke: var(--color-text-secondary, rgba(255,255,255,0.2));
 }
 
 .rating-circle .circle-progress {
-    stroke: var(--color-accent);
+stroke: var(--progress-color, var(--color-accent, #22c55e));
 }
 
 .rating-text {
-    font-size: 1.1rem;
-    font-weight: bold;
-    color: var(--color-accent);
+font-size: 1.1rem;
+font-weight: bold;
+color: var(--progress-color, var(--color-accent, #22c55e));
+}
+
+/* Pills (mobile info cards) */
+.info-pill {
+background: rgba(255,255,255,0.08);
+border: 1px solid rgba(255,255,255,0.08);
+border-radius: 18px;
+padding: 14px 16px;
+min-width: 120px;
+}
+
+.info-pill .label {
+font-size: 0.8rem;
+opacity: 0.85;
+}
+
+.info-pill .value {
+font-weight: 700;
+font-size: 1rem;
+}
+
+/* Horizontal carousels */
+.horizontal-scroll {
+display: grid;
+grid-auto-flow: column;
+grid-auto-columns: max-content;
+gap: 12px;
+overflow-x: auto;
+padding-bottom: 4px;
+scroll-snap-type: x proximity;
+}
+
+.horizontal-scroll > * {
+scroll-snap-align: start;
+}
+
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Sticky CTA on mobile */
+.sticky-cta {
+position: fixed;
+left: 50%;
+transform: translateX(-50%);
+bottom: 16px;
+z-index: 40;
+padding: 14px 24px;
+border-radius: 16px;
+font-weight: 800;
+background: #10b981; /* teal-500 */
+color: #0b1220;
+box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+}
+
+.sticky-cta.secondary {
+background: #3b82f6; /* blue-500 */
+color: #0b1220;
+}
+
+/* Accordion-like episode card */
+.episode-card {
+background: rgba(255,255,255,0.08);
+border: 1px solid rgba(255,255,255,0.08);
+border-radius: 16px;
+padding: 12px;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+.rating-circle circle { transition: none; }
+.glass-card { -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
