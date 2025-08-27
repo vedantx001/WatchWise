@@ -10,15 +10,15 @@ router.post(
   "/",
   auth,
   [
-    // Validation for new movie/tv show
-    check("title", "Title is required").not().isEmpty(),
-    check("duration", "Duration must be a number").optional().isNumeric(),
-    check("rating", "Rating must be between 0 and 10").optional().isFloat({ min: 0, max: 10 }),
-    check("status", "Invalid status").optional().isIn(["planned", "watching", "completed"]),
-    check("contentType", "Content type must be 'movie' or 'tv'").optional().isIn(["movie", "tv"]),
-    // If tmdbId is provided, it must be a string and contentType must also be present
-    check("tmdbId", "TMDB ID is required for TMDB content").not().isEmpty().isString(),
-    check("contentType", "Content type is required if TMDB ID is provided").isIn(["movie", "tv"]),
+    // --- Validation ---
+    check("tmdbId", "TMDB ID is required").notEmpty().isString(),
+    check("contentType", "Content type is required").isIn(["movie", "tv"]),
+    check("status", "Invalid status")
+      .optional()
+      .isIn(["planned", "watching", "completed"]),
+    check("rating", "Rating must be between 0 and 10")
+      .optional()
+      .isFloat({ min: 0, max: 10 }),
     check("seasonNumber")
       .if((value, { req }) => req.body.contentType === "tv")
       .isInt({ min: 0 })
@@ -31,11 +31,17 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
 
+    const {
+      status,
+      rating,
+      favorite,
+      tmdbId,
+      contentType,
+      seasonNumber,
+    } = req.body;
 
-    const { title, genre, duration, status, rating, posterPath, tmdbId, contentType, favorite, seasonNumber } = req.body;
-
-  try {
-    if (contentType === "movie") {
+    try {
+      if (contentType === "movie") {
         // ----- Handle Movie -----
         const tmdbData = await fetchMovieDetails(tmdbId);
 
@@ -54,9 +60,9 @@ router.post(
         const newMovie = new Movie({
           user: req.user.id,
           tmdbId,
-          contentType: "movie",
+          contentType,
           status: status || "planned",
-          rating: rating || 0,
+          rating: tmdbData.vote_average || 0,
           favorite: favorite || false,
           completedDate: status === "completed" ? new Date() : null,
           title: tmdbData.title,
@@ -71,9 +77,10 @@ router.post(
 
         const saved = await newMovie.save();
         return res.status(201).json(saved);
+
       } else if (contentType === "tv") {
         // ----- Handle TV SEASON -----
-        if (!seasonNumber && seasonNumber !== 0) {
+        if (seasonNumber === undefined || seasonNumber === null) {
           return res
             .status(400)
             .json({ msg: "Season number is required for TV shows" });
@@ -82,7 +89,47 @@ router.post(
         const tvData = await fetchTvShowDetails(tmdbId);
         const seasonData = await fetchSeasonDetails(tmdbId, seasonNumber);
 
-        // See if the show already exists in user’s watchlist
+        // Calculate totals
+        const totalEpisodes =
+          tvData.seasons?.reduce((acc, s) => acc + (s.episode_count || 0), 0) ||
+          0;
+
+        let allEpisodeDurations = [];
+        if (tvData.seasons && Array.isArray(tvData.seasons)) {
+          for (const s of tvData.seasons) {
+            if (
+              s.episode_count &&
+              tvData.episode_run_time &&
+              tvData.episode_run_time.length > 0
+            ) {
+              allEpisodeDurations.push(
+                ...Array(s.episode_count).fill(tvData.episode_run_time[0])
+              );
+            }
+          }
+        }
+        if (seasonData.episodes && Array.isArray(seasonData.episodes)) {
+          for (const ep of seasonData.episodes) {
+            if (ep.runtime) {
+              allEpisodeDurations.push(ep.runtime);
+            }
+          }
+        }
+
+        const totalDuration = allEpisodeDurations.reduce(
+          (acc, d) => acc + (d || 0),
+          0
+        );  
+
+        // Season duration
+        const seasonDuration =
+          seasonData.episodes?.reduce(
+            (acc, ep) =>
+              acc + (ep.runtime || tvData.episode_run_time?.[0] || 0),
+            0
+          ) || 0;
+
+        // Find existing show
         let existingShow = await Movie.findOne({
           user: req.user.id,
           tmdbId,
@@ -90,9 +137,9 @@ router.post(
         });
 
         if (existingShow) {
-          // If season already exists, prevent duplicates
+          // Check if season already exists
           const alreadyAdded = existingShow.seasons.find(
-            (s) => s.seasonNumber === seasonNumber
+            (s) => Number(s.seasonNumber) === Number(seasonNumber)
           );
           if (alreadyAdded) {
             return res
@@ -100,12 +147,13 @@ router.post(
               .json({ msg: "This season is already in your watchlist." });
           }
 
-          // Otherwise add the season
+          // Add new season
           existingShow.seasons.push({
             seasonNumber,
             title: seasonData.name || `Season ${seasonNumber}`,
             overview: seasonData.overview,
             episodeCount: seasonData.episodes.length,
+            duration: seasonDuration,
             posterPath: seasonData.poster_path
               ? `${TMDB_IMAGE_BASE_URL}${seasonData.poster_path}`
               : existingShow.posterPath,
@@ -113,16 +161,25 @@ router.post(
             episodes: seasonData.episodes.map((ep) => ({
               episodeNumber: ep.episode_number,
               name: ep.name,
-              duration:
-                ep.runtime || tvData.episode_run_time?.[0] || 0,
+              duration: ep.runtime || tvData.episode_run_time?.[0] || 0,
               overview: ep.overview,
+              airDate: ep.air_date ? new Date(ep.air_date) : null,
+              rating: ep.vote_average || 0,
             })),
           });
 
+          // Update show-level fields
+          existingShow.duration = totalDuration;
+          existingShow.tmdbRating = tvData.vote_average || 0;
+          existingShow.inProduction = tvData.in_production;
+          existingShow.totalEpisodes = totalEpisodes;
+          existingShow.totalSeasons = tvData.number_of_seasons;
+
           await existingShow.save();
           return res.status(201).json(existingShow);
+
         } else {
-          // Create new show entry with first selected season
+          // Create new show
           const newShow = new Movie({
             user: req.user.id,
             tmdbId,
@@ -136,12 +193,16 @@ router.post(
             language: tvData.original_language,
             totalSeasons: tvData.number_of_seasons,
             inProduction: tvData.in_production,
+            duration: totalDuration,
+            tmdbRating: tvData.vote_average || 0,
+            totalEpisodes,
             seasons: [
               {
                 seasonNumber,
                 title: seasonData.name || `Season ${seasonNumber}`,
                 overview: seasonData.overview,
                 episodeCount: seasonData.episodes.length,
+                duration: seasonDuration,
                 posterPath: seasonData.poster_path
                   ? `${TMDB_IMAGE_BASE_URL}${seasonData.poster_path}`
                   : null,
@@ -149,9 +210,10 @@ router.post(
                 episodes: seasonData.episodes.map((ep) => ({
                   episodeNumber: ep.episode_number,
                   name: ep.name,
-                  duration:
-                    ep.runtime || tvData.episode_run_time?.[0] || 0,
+                  duration: ep.runtime || tvData.episode_run_time?.[0] || 0,
                   overview: ep.overview,
+                  airDate: ep.air_date ? new Date(ep.air_date) : null,
+                  rating: ep.vote_average || 0,
                 })),
               },
             ],
@@ -162,12 +224,14 @@ router.post(
         }
       }
     } catch (err) {
-  console.error("POST /api/movies error:", err);
-  res.status(500).send("Server error: " + err.message);
+      console.error("POST /api/movies error:", err);
+      res.status(500).send("Server error: " + err.message);
     }
   }
 );
 
+
+// UPDATE MOVIE STATUS
 router.put("/:id", auth, async (req, res) => {
   const { status } = req.body;
 
@@ -178,9 +242,13 @@ router.put("/:id", auth, async (req, res) => {
     if (item.user.toString() !== req.user.id)
       return res.status(401).json({ msg: "Not authorized" });
 
-    if (status) {
-      item.status = status;
-      item.completedDate = status === "completed" ? new Date() : null;
+    if (item.contentType === "movie") {
+      if (status) {
+        item.status = status;
+        item.completedDate = status === "completed" ? new Date() : null;
+      }
+    } else {
+      return res.status(400).json({ msg: "Use season route for TV shows" });
     }
 
     await item.save();
@@ -191,30 +259,21 @@ router.put("/:id", auth, async (req, res) => {
   }
 });
 
-// @route   PUT api/movies/:id/favorite
-// @desc    Toggle favorite status of a movie/tv show
-// @access  Private
+// TOGGLE FAVORITE (works for both movies & TV shows)
 router.put("/:id/favorite", auth, async (req, res) => {
   try {
-    let movie = await Movie.findById(req.params.id);
+    let item = await Movie.findById(req.params.id);
+    if (!item) return res.status(404).json({ msg: "Not found" });
 
-    if (!movie) {
-      return res.status(404).json({ msg: "Movie/TV show not found" });
-    }
+    if (item.user.toString() !== req.user.id)
+      return res.status(401).json({ msg: "Not authorized" });
 
-    if (movie.user.toString() !== req.user.id) {
-      return res.status(401).json({ msg: "User not authorized" });
-    }
+    item.favorite = !item.favorite;
+    await item.save();
 
-    movie.favorite = !movie.favorite; // Toggle the favorite status
-    await movie.save();
-
-    res.json(movie);
+    res.json(item);
   } catch (err) {
     console.error(err.message);
-    if (err.kind === "ObjectId") {
-      return res.status(404).json({ msg: "Movie/TV show not found" });
-    }
     res.status(500).send("Server error");
   }
 });
@@ -222,6 +281,7 @@ router.put("/:id/favorite", auth, async (req, res) => {
 // UPDATE SEASON STATUS
 router.put("/:id/season/:seasonNumber", auth, async (req, res) => {
   const { status } = req.body;
+
   try {
     const show = await Movie.findById(req.params.id);
     if (!show || show.contentType !== "tv")
@@ -235,9 +295,24 @@ router.put("/:id/season/:seasonNumber", auth, async (req, res) => {
     );
     if (!season) return res.status(404).json({ msg: "Season not found" });
 
+    // Update season status
     season.status = status;
-    if (status === "completed") season.completedDate = new Date();
-    else season.completedDate = null;
+    season.completedDate = status === "completed" ? new Date() : null;
+
+    // 🔄 Update parent show status dynamically
+    const allCompleted = show.seasons.every((s) => s.status === "completed");
+    const anyWatching = show.seasons.some((s) => s.status === "watching");
+
+    if (allCompleted) {
+      show.status = "completed";
+      show.completedDate = new Date();
+    } else if (anyWatching) {
+      show.status = "watching";
+      show.completedDate = null;
+    } else {
+      show.status = "planned";
+      show.completedDate = null;
+    }
 
     await show.save();
     res.json(show);
@@ -248,20 +323,47 @@ router.put("/:id/season/:seasonNumber", auth, async (req, res) => {
 });
 
 
+
 // @route   GET api/movies
-// @desc    Get all watchlist movies/tv shows for a user
+// @desc    Get all watchlist movies/tv shows for a user (with filters)
 // @access  Private
 router.get("/", auth, async (req, res) => {
   try {
-    const movies = await Movie.find({ user: req.user.id }).sort({
-      createdAt: -1,
-    }); // Sort by most recent first
-    res.json(movies);
+    const { contentType, status, favorite, sort } = req.query;
+
+    let filter = { user: req.user.id };
+
+    if (contentType) filter.contentType = contentType;
+    if (status) filter.status = status;
+    if (favorite) filter.favorite = favorite === "true";
+
+    // Default sorting by created date
+    let sortOption = { createdAt: -1 };
+    if (sort === "rating") sortOption = { rating: -1 };
+    if (sort === "title") sortOption = { title: 1 };
+
+    let items = await Movie.find(filter).sort(sortOption);
+
+    // Post-process TV shows' parent status dynamically
+    items = items.map((item) => {
+      if (item.contentType === "tv" && item.seasons && item.seasons.length > 0) {
+        const allCompleted = item.seasons.every((s) => s.status === "completed");
+        const anyWatching = item.seasons.some((s) => s.status === "watching");
+
+        if (allCompleted) item.status = "completed";
+        else if (anyWatching) item.status = "watching";
+        else item.status = "planned";
+      }
+      return item;
+    });
+
+    res.json(items);
   } catch (err) {
     console.error(err.message);
     res.status(500).send("Server error");
   }
 });
+
 
 // @route DELETE api/movies/clear
 // @desc Delete every movie or tv from watchlist
@@ -312,327 +414,231 @@ router.delete("/:id", auth, async (req, res) => {
   }
 });
 
+// Helper function to format duration in minutes to "Xd Yh Zm"
+const formatDuration = (totalMinutes) => {
+  if (!totalMinutes || totalMinutes <= 0) {
+    return "0m";
+  }
+  const days = Math.floor(totalMinutes / 1440); // 60 * 24
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
 
-// @route   GET api/movies/stats
-// @desc    Get comprehensive watchlist statistics for a user, with filters
-// @access  Private
-// @params  contentType (optional): 'movie' or 'tv'. Defaults to all.
-// @params  timeFilter (optional): 'overall', 'year', 'month'. Defaults to 'overall'.
+  let result = "";
+  if (days > 0) result += `${days}d `;
+  if (hours > 0) result += `${hours}h `;
+  if (minutes > 0 || result === "") result += `${minutes}m`;
+  
+  return result.trim();
+};
+
+// routes/movies.js (or wherever your stats route is defined)
 router.get("/stats", auth, async (req, res) => {
-    try {
-        const userId = new mongoose.Types.ObjectId(req.user.id);
-        const { contentType, timeFilter } = req.query; // Get filters from query parameters
+  try {
+    const userId = req.user.id;
+    const { contentType, period = "overall" } = req.query;
 
-        let matchStage = { user: userId }; // Start with user filter
-
-        // Add content type filter if provided
-        if (contentType && (contentType === 'movie' || contentType === 'tv')) {
-            matchStage.contentType = contentType;
-        }
-
-        // Define time-based filtering for relevant stats (e.g., completed items)
-        let completedDateMatch = {};
-        if (timeFilter && timeFilter !== 'overall') {
-            const now = new Date();
-            let pastDate = new Date();
-
-            if (timeFilter === 'year') {
-                pastDate.setFullYear(now.getFullYear() - 1); // Last 365 days
-            } else if (timeFilter === 'month') {
-                pastDate.setMonth(now.getMonth() - 1); // Last 30 days
-            }
-            completedDateMatch = { completedDate: { $gte: pastDate.toISOString() } };
-        }
-
-        // --- Aggregation Pipeline ---
-        const aggregationPipeline = [
-            // Stage 1: Initial filter by user and content type
-            { $match: matchStage },
-            // Stage 2: Separate completed items by time filter for specific stats, and add dayOfWeek
-            {
-                $addFields: {
-                    isCompletedFiltered: {
-                        $and: [
-                            { $eq: ["$status", "completed"] },
-                            { $ne: ["$completedDate", null] },
-                            Object.keys(completedDateMatch).length > 0 ? { $gte: ["$completedDate", completedDateMatch.completedDate.$gte] } : { $literal: true }
-                        ]
-                    },
-                    dayOfWeek: {
-                        $cond: {
-                            if: { $and: [{ $ne: ["$completedDate", null] }, { $eq: ["$status", "completed"] }] },
-                            then: { $dayOfWeek: { $toDate: "$completedDate" } }, // 1 (Sunday) to 7 (Saturday)
-                            else: null
-                        }
-                    }
-                }
-            },
-            // Stage 3: Group all documents to calculate overall stats and collect necessary data
-            {
-                $group: {
-                    _id: null, // Group all into a single document
-                    totalItems: { $sum: 1 }, // Count all items (movies + tv shows)
-                    completedCount: {
-                        $sum: { $cond: ["$isCompletedFiltered", 1, 0] }
-                    },
-                    totalDurationMinutes: {
-                        $sum: { $cond: ["$isCompletedFiltered", "$duration", 0] }
-                    },
-                    avgRating: { $avg: "$rating" },
-                    highestRating: { $max: "$rating" },
-                    lowestRating: { $min: "$rating" },
-
-                    // Collect all items for secondary calculations (best/worst, top rated)
-                    allItems: { $push: "$$ROOT" },
-
-                    // Collect genres from *completed and filtered* items for favorite genre calculation
-                    allCompletedAndFilteredGenres: {
-                        $push: {
-                            $cond: ["$isCompletedFiltered", "$genre", "$$REMOVE"]
-                        }
-                    },
-                    // Collect durations for daily activity (pre-filtered)
-                    dailyActivityData: {
-                        $push: {
-                            $cond: [
-                            "$isCompletedFiltered",
-                            {
-                                day: "$dayOfWeek",
-                                count: 1 // both movie and tv = +1
-                            },
-                            "$$REMOVE"
-                            ]
-                        }
-                    }
-                },
-            },
-            // Stage 4: Post-processing for best/worst titles, favorite genre, top rated, and daily activity
-            {
-                $addFields: {
-                    // Best/Worst Rated Titles: Filter allItems
-                    bestRatedTitle: {
-                        $arrayElemAt: [
-                            {
-                                $map: {
-                                    input: {
-                                        $filter: {
-                                            input: "$allItems",
-                                            as: "item",
-                                            cond: { $eq: ["$$item.rating", "$highestRating"] }
-                                        }
-                                    },
-                                    as: "bestItem",
-                                    in: "$$bestItem.title"
-                                }
-                            }, 0
-                        ]
-                    },
-                    worstRatedTitle: {
-                        $arrayElemAt: [
-                            {
-                                $map: {
-                                    input: {
-                                        $filter: {
-                                            input: "$allItems",
-                                            as: "item",
-                                            cond: { $eq: ["$$item.rating", "$lowestRating"] }
-                                        }
-                                    },
-                                    as: "worstItem",
-                                    in: "$$worstItem.title"
-                                }
-                            }, 0
-                        ]
-                    },
-
-                    // Favorite Genre Calculation - REVISED
-                    favoriteGenre: {
-                        $cond: [
-                            { $eq: [{ $size: "$allCompletedAndFilteredGenres" }, 0] },
-                            "N/A",
-                            {
-                                $let: {
-                                    vars: {
-                                        // Flatten the array of arrays of genres
-                                        flattenedGenres: {
-                                            $reduce: {
-                                                input: "$allCompletedAndFilteredGenres",
-                                                initialValue: [],
-                                                in: { $concatArrays: ["$$value", "$$this"] }
-                                            }
-                                        }
-                                    },
-                                    in: {
-                                        $let: {
-                                            vars: {
-                                                // Count genre occurrences and create an array of { k: genreName, v: count }
-                                                genreCountsArray: {
-                                                    $map: {
-                                                        input: { $setUnion: "$$flattenedGenres" }, // Get unique genres
-                                                        as: "g",
-                                                        in: {
-                                                            k: "$$g",
-                                                            v: {
-                                                                $size: {
-                                                                    $filter: {
-                                                                        input: "$$flattenedGenres",
-                                                                        as: "fg",
-                                                                        cond: { $eq: ["$$fg", "$$g"] }
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            },
-                                            in: {
-                                                // Find the genre with the maximum count
-                                                $arrayElemAt: [
-                                                    "$$genreCountsArray",
-                                                    {
-                                                        $indexOfArray: [
-                                                            { $map: { input: "$$genreCountsArray", as: "gc", in: "$$gc.v" } },
-                                                            { $max: { $map: { input: "$$genreCountsArray", as: "gc", in: "$$gc.v" } } }
-                                                        ]
-                                                    }
-                                                ]
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        ]
-                    },
-
-                    // Top Rated Items: Filter and sort allItems
-                    topRatedItems: {
-                        $slice: [
-                            {
-                                $sortArray: {
-                                    input: {
-                                        $filter: {
-                                            input: "$allItems",
-                                            as: "item",
-                                            cond: { $gt: ["$$item.rating", 0] } // Only consider rated items
-                                        }
-                                    },
-                                    sortBy: { rating: -1 }
-                                }
-                            },
-                            10 // Get top 10
-                        ]
-                    },
-
-                    // Daily Activity:
-                    dailyActivity: {
-                        $let: {
-                            vars: {
-                                weekdayNames: ["", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-                            },
-                            in: {
-                                $map: {
-                                    input: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
-                                    as: "dayName",
-                                    in: {
-                                        day: "$$dayName",
-                                        count: {
-                                            $sum: {
-                                                $map: {
-                                                    input: {
-                                                        $filter: {
-                                                            input: "$dailyActivityData",
-                                                            as: "item",
-                                                            cond: { $eq: [{ $arrayElemAt: ["$$weekdayNames", "$$item.day"] }, "$$dayName"] }
-                                                        }
-                                                    },
-                                                    as: "filteredItem",
-                                                    in: "$$filteredItem.count"
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            // Stage 5: Project the final output structure
-            {
-                $project: {
-                    _id: 0,
-                    totalItems: 1,
-                    completedCount: 1,
-                    totalHours: { $round: [{ $divide: ["$totalDurationMinutes", 60] }, 1] },
-                    avgRating: { $round: ["$avgRating", 1] },
-                    highestRating: {
-                        $cond: [
-                            { $eq: ["$highestRating", null] }, // if no rating at all
-                            null,
-                            { $round: ["$highestRating", 1] } // otherwise round it
-                        ]
-                        },
-                    lowestRating: {
-                        $cond: [
-                            { $eq: ["$lowestRating", null] }, // if no rating at all
-                            null,
-                            { $round: ["$lowestRating", 1] } // otherwise round it (can be 0 if real)
-                        ]
-                    },
-                    best: "$bestRatedTitle",
-                    worst: "$worstRatedTitle",
-                    favoriteGenre: {
-                        $cond: [
-                            { $eq: ["$favoriteGenre", "N/A"] },
-                            "N/A",
-                            "$favoriteGenre.k"
-                        ]
-                    },
-                    topRated: {
-                        $map: { // Project only necessary fields for topRated items
-                            input: "$topRatedItems",
-                            as: "item",
-                            in: {
-                                _id: "$$item._id",
-                                title: "$$item.title",
-                                rating: "$$item.rating",
-                                contentType: "$$item.contentType",
-                                tmdbId: "$$item.tmdbId" // Ensure tmdbId is passed for frontend Link
-                            }
-                        }
-                    },  
-                    dailyActivity: 1
-                }
-            }
-        ];
-
-        const statsResult = await Movie.aggregate(aggregationPipeline);
-
-        if (statsResult.length === 0 || statsResult[0].totalItems === 0) {
-            // Return default zero stats if no items match the filters
-            return res.json({
-                totalItems: 0,
-                completedCount: 0,
-                totalHours: 0,
-                avgRating: 0,
-                highestRating: 0,
-                lowestRating: 0,
-                best: "N/A",
-                worst: "N/A",
-                favoriteGenre: "N/A",
-                topRated: [],
-                dailyActivity: [
-                    { day: "Mon", count: 0 }, { day: "Tue", count: 0 }, { day: "Wed", count: 0 },
-                    { day: "Thu", count: 0 }, { day: "Fri", count: 0 }, { day: "Sat", count: 0 }, { day: "Sun", count: 0 }
-                ]
-            });
-        }
-
-        res.json(statsResult[0]); // Send the first (and only) result document
-    } catch (err) {
-        console.error("Dashboard Stats Error:", err.message);
-        res.status(500).send("Server error");
+    if (!["movie", "tv"].includes(contentType)) {
+      return res.status(400).json({ error: "contentType must be 'movie' or 'tv'" });
     }
+
+    // --- Date Filtering Logic ---
+    let dateFilter = {};
+    const now = new Date();
+    if (period === "thisYear") {
+      const startOfYear = new Date(now.getFullYear(), 0, 1);
+      // FIXED: Use 'completedDate' instead of 'completedAt'
+      dateFilter = { completedDate: { $gte: startOfYear } };
+    } else if (period === "thisMonth") {
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      // FIXED: Use 'completedDate' instead of 'completedAt'
+      dateFilter = { completedDate: { $gte: startOfMonth } };
+    }
+
+    // =============================================
+    // =========== MOVIES STATS LOGIC ==============
+    // =============================================
+    if (contentType === "movie") {
+      const query = {
+        user: userId,
+        contentType: "movie", // <-- FIXED
+        status: "completed",
+        ...dateFilter,
+      };
+      
+      const movies = await Movie.find(query);
+
+      if (movies.length === 0) {
+        return res.json({ stats: {}, dailyActivity: [], top5: [] });
+      }
+
+      const watchCount = movies.length;
+      const totalRating = movies.reduce((sum, m) => sum + (m.rating || 0), 0);
+      const avgRate = watchCount > 0 ? (totalRating / watchCount) : 0;
+      // FIXED: Use 'duration' instead of 'runtime'
+      const totalWatchTime = movies.reduce((sum, m) => sum + (m.duration || 0), 0);
+
+      const bestMovie = movies.reduce((max, m) => (m.rating > max.rating ? m : max), movies[0]);
+      const worstMovie = movies.reduce((min, m) => (m.rating < min.rating ? m : min), movies[0]);
+
+      // FIXED: Use 'genre' instead of 'genres'
+      const genreCounts = movies.flatMap(m => m.genre || []).reduce((acc, genre) => {
+        acc[genre] = (acc[genre] || 0) + 1;
+        return acc;
+      }, {});
+      const favoriteGenre = Object.keys(genreCounts).reduce((a, b) => genreCounts[a] > genreCounts[b] ? a : b, null);
+
+      const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const dailyActivityMap = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
+      movies.forEach(m => {
+          // FIXED: Use 'completedDate' instead of 'completedAt'
+          const day = weekdays[new Date(m.completedDate).getDay()];
+          if(day) dailyActivityMap[day]++;
+      });
+      const dailyActivity = Object.entries(dailyActivityMap).map(([day, count]) => ({ day, count }));
+
+      const top5 = [...movies]
+        .sort((a, b) => b.rating - a.rating)
+        .slice(0, 5)
+        .map(m => ({ id: m._id, title: m.title, rating: m.rating, posterPath: m.posterPath }));
+
+      return res.json({
+        stats: {
+          watchCount,
+          avgRate: parseFloat(avgRate.toFixed(2)),
+          bestRatedMovie: bestMovie.title,
+          bestRate: bestMovie.rating,
+          worstRatedMovie: worstMovie.title,
+          worstRate: worstMovie.rating,
+          favoriteGenre,
+          watchTime: formatDuration(totalWatchTime),
+        },
+        dailyActivity,
+        top5,
+      });
+    }
+
+    // =============================================
+    // ============ TV SERIES STATS LOGIC ==========
+    // =============================================
+    if (contentType === "tv") {
+      const userShows = await Movie.find({ user: userId, contentType: "tv" });
+
+      // Gather all completed seasons with their parent info
+      const allCompletedSeasons = userShows.flatMap(show =>
+        (show.seasons || [])
+          .filter(s => s.status === 'completed')
+          .map(s => ({
+            ...s.toObject(),
+            showId: show._id,
+            showTitle: show.title,
+            showGenres: Array.isArray(show.genre) ? show.genre : (show.genre ? [show.genre] : []),
+            seasonRating: typeof s.voteAverage === 'number' ? s.voteAverage : null
+          }))
+      );
+
+      // Filter by completedDate and period
+      const filteredSeasons = allCompletedSeasons.filter(s => {
+        if (!s.completedDate) return false;
+        const completedDate = new Date(s.completedDate);
+        if (period === 'thisYear') return completedDate >= new Date(now.getFullYear(), 0, 1);
+        if (period === 'thisMonth') return completedDate >= new Date(now.getFullYear(), now.getMonth(), 1);
+        return true;
+      });
+
+      if (filteredSeasons.length === 0) {
+        return res.json({ stats: {}, dailyActivity: [], top5: [] });
+      }
+
+      // Watch count = completed seasons
+      const watchCount = filteredSeasons.length;
+      // Episodes watched = sum of episodeCount
+      const totalEpisodes = filteredSeasons.reduce((sum, s) => sum + (s.episodeCount || 0), 0);
+      // Watch time = sum of durations
+      const totalWatchTime = filteredSeasons.reduce((sum, s) => sum + (s.duration || 0), 0);
+
+      // Group by showId for show-level stats
+      const showStatsMap = new Map();
+      filteredSeasons.forEach(season => {
+        if (!showStatsMap.has(season.showId)) {
+          showStatsMap.set(season.showId, {
+            title: season.showTitle,
+            genres: season.showGenres,
+            ratings: [],
+            seasonCount: 0,
+          });
+        }
+        const show = showStatsMap.get(season.showId);
+        if (typeof season.seasonRating === 'number') show.ratings.push(season.seasonRating);
+        show.seasonCount++;
+      });
+
+      // Only count shows with at least one completed season
+      const tvSeriesWatched = Array.from(showStatsMap.values()).filter(s => s.seasonCount > 0).length;
+
+      // Calculate show averages
+      const showAverages = Array.from(showStatsMap.values()).map(show => ({
+        ...show,
+        avgRating: show.ratings.length > 0 ? (show.ratings.reduce((a, b) => a + b, 0) / show.ratings.length) : 0,
+      }));
+
+      // Avg. rate = average across all completed seasons
+      const totalSeasonRatings = filteredSeasons.reduce((sum, s) => sum + (typeof s.seasonRating === 'number' ? s.seasonRating : 0), 0);
+      const avgRate = watchCount > 0 ? (totalSeasonRatings / watchCount) : 0;
+
+      // Best/worst series by show average
+      const bestSeries = showAverages.reduce((max, s) => (s.avgRating > max.avgRating ? s : max), showAverages[0]);
+      const worstSeries = showAverages.reduce((min, s) => (s.avgRating < min.avgRating ? s : min), showAverages[0]);
+
+      // Favorite genre: most-watched genre (single string)
+      const genreCounts = showAverages.flatMap(s => s.genres || []).reduce((acc, genre) => {
+        acc[genre] = (acc[genre] || 0) + 1;
+        return acc;
+      }, {});
+      const favoriteGenre = Object.keys(genreCounts).reduce((a, b) => genreCounts[a] > genreCounts[b] ? a : b, null);
+
+      // Daily activity: count of seasons completed per weekday
+      const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const dailyActivityMap = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
+      filteredSeasons.forEach(s => {
+        const day = weekdays[new Date(s.completedDate).getDay()];
+        if(day) dailyActivityMap[day]++;
+      });
+      const dailyActivity = Object.entries(dailyActivityMap).map(([day, count]) => ({ day, count }));
+
+      // Top 5/10: shows ranked by average rating of completed seasons
+      const top5 = [...showAverages]
+        .sort((a, b) => b.avgRating - a.avgRating)
+        .slice(0, 5)
+        .map(s => ({ title: s.title, rating: parseFloat(s.avgRating.toFixed(2)) }));
+      const top10 = [...showAverages]
+        .sort((a, b) => b.avgRating - a.avgRating)
+        .slice(0, 10)
+        .map(s => ({ title: s.title, rating: parseFloat(s.avgRating.toFixed(2)) }));
+
+      return res.json({
+        stats: {
+          watchCount,
+          avgRate: parseFloat(avgRate.toFixed(2)),
+          bestRatedTVSeries: bestSeries.title,
+          bestRate: parseFloat(bestSeries.avgRating.toFixed(2)),
+          worstRatedTVSeries: worstSeries.title,
+          worstRate: parseFloat(worstSeries.avgRating.toFixed(2)),
+          episodesWatched: totalEpisodes,
+          tvSeriesWatched,
+          favoriteGenre,
+          watchTime: formatDuration(totalWatchTime),
+        },
+        dailyActivity,
+        top5,
+        top10,
+      });
+    }
+
+  } catch (error) {
+    console.error("Error in /stats route:", error);
+    res.status(500).json({ error: "Server error occurred while fetching stats." });
+  }
 });
+
 
 module.exports = router;

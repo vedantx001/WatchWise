@@ -1,25 +1,30 @@
 import { useEffect, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import api from "../api";
-import "../styles/dashboard.css"; // Ensure this CSS file exists and is correctly linked
-
+import api from "../api"; // Your API instance
+import "../styles/dashboard.css"; // Your custom styles
 
 function Dashboard() {
-  const [contentTypeFilter, setContentTypeFilter] = useState("all"); // 'all', 'movie', or 'tv'
+  const [contentTypeFilter, setContentTypeFilter] = useState("movie"); // 'movie' or 'tv'
   const [timeFilter, setTimeFilter] = useState("overall"); // 'overall', 'year', 'month'
-  const [showAllTop, setShowAllTop] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState(null); // Will hold all comprehensive stats from backend
+  const [stats, setStats] = useState(null);
 
   useEffect(() => {
     const fetchDashboardStats = async () => {
       setLoading(true);
       try {
-        const params = {
-          contentType: contentTypeFilter === 'all' ? undefined : contentTypeFilter,
-          timeFilter: timeFilter
-        };
-        const res = await api.get("/movies/stats", { params });
+        // Map frontend filter state to backend query parameter
+        const period = {
+          year: "thisYear",
+          month: "thisMonth",
+        }[timeFilter] || "overall";
+
+        const res = await api.get("/stats", { // Using the new /stats endpoint
+          params: {
+            contentType: contentTypeFilter,
+            period: period,
+          },
+        });
         setStats(res.data);
       } catch (error) {
         console.error("Failed to fetch dashboard data:", error);
@@ -29,18 +34,10 @@ function Dashboard() {
       }
     };
     fetchDashboardStats();
-  }, [contentTypeFilter, timeFilter]); // Re-fetch when filters change
+  }, [contentTypeFilter, timeFilter]);
 
-  // Define themes based on content type filter
+  // Define themes based on content type
   const theme = {
-    all: {
-      accent: "red",
-      mainText: "text-red-400",
-      secondaryText: "text-red-500",
-      bg: "bg-red-500",
-      border: "border-red-500",
-      fill: "#ef4444", // Tailwind red-500
-    },
     movie: {
       accent: "amber",
       mainText: "text-amber-400",
@@ -61,124 +58,120 @@ function Dashboard() {
   const activeTheme = theme[contentTypeFilter];
 
   if (loading) {
-    return <div className="text-white p-8 text-center">Loading dashboard...</div>;
+    return <div className="text-white p-8 text-center text-lg">Loading dashboard...</div>;
+  }
+  
+  // Check if there are any stats to display
+  if (!stats || !stats.stats || Object.keys(stats.stats).length === 0) {
+      return (
+        <div className="min-h-screen font-sans p-4 md:p-8 bg-[var(--color-background-primary)] text-[var(--color-text-primary)]">
+            <div className="max-w-4xl mx-auto">
+                <ContentTypeSelector
+                    contentTypeFilter={contentTypeFilter}
+                    setContentTypeFilter={setContentTypeFilter}
+                    theme={theme}
+                />
+                <div className="text-center py-20 bg-gray-800 rounded-lg">
+                    <h2 className="text-2xl font-bold mb-2">No Data Available</h2>
+                    <p className="text-gray-400">There's no completed content to show for this period.</p>
+                </div>
+            </div>
+        </div>
+      );
   }
 
-  // Default stats if fetching failed or no data
-  const currentStats = stats || {
-    totalItems: 0,
-    completedCount: 0,
-    totalHours: 0,
-    avgRating: 0,
-    highestRating: 0,
-    lowestRating: 0,
-    best: "N/A",
-    worst: "N/A",
-    favoriteGenre: "N/A",
-    topRated: [],
-    dailyActivity: [
-      { day: "Mon", count: 0 }, { day: "Tue", count: 0 }, { day: "Wed", count: 0 },
-      { day: "Thu", count: 0 }, { day: "Fri", count: 0 }, { day: "Sat", count: 0 }, { day: "Sun", count: 0 }
-    ]
-  };
+  const { stats: mainStats, dailyActivity, top5 = [], top10 = [] } = stats;
+  // Helper to format watch time (Xd Yh Zm)
+  function formatWatchTime(totalMinutes) {
+    if (!totalMinutes || totalMinutes <= 0) return "0m";
+    const minutesInDay = 1440;
+    const minutesInHour = 60;
+    const days = Math.floor(totalMinutes / minutesInDay);
+    const remainingMinutesAfterDays = totalMinutes % minutesInDay;
+    const hours = Math.floor(remainingMinutesAfterDays / minutesInHour);
+    const minutes = Math.round(remainingMinutesAfterDays % minutesInHour);
+    const parts = [];
+    if (days > 0) parts.push(`${days}d`);
+    if (hours > 0) parts.push(`${hours}h`);
+    if (minutes > 0) parts.push(`${minutes}m`);
+    if (parts.length === 0 && totalMinutes > 0) return "1m";
+    return parts.join(" ") || "0m";
+  }
+
+  // Top list toggle
+  const [showAllTop, setShowAllTop] = useState(false);
+  const topList = showAllTop && top10.length > 0 ? top10 : top5;
 
   return (
-    <div
-      className="min-h-screen font-sans p-4 md:p-8 bg-[var(--color-background-primary)] dark:bg-[var(--color-background-primary)] text-[var(--color-text-primary)] dark:text-[var(--color-text-primary)]"
-    >
+    <div className="min-h-screen font-sans p-4 md:p-8 bg-[var(--color-background-primary)] text-[var(--color-text-primary)]">
       <div className="max-w-4xl mx-auto">
-        {/* Content Type Selector (All / Movies / TV Shows) */} 
-        <div className="flex justify-center border-b border-gray-700 mb-6 sticky top-0 bg-gray-900 z-10 py-2">
-          <TabButton title="All Content" isActive={contentTypeFilter === 'all'} onClick={() => setContentTypeFilter('all')} theme={theme.all} />
-          <TabButton title="Movies" isActive={contentTypeFilter === 'movie'} onClick={() => setContentTypeFilter('movie')} theme={theme.movie} />
-          <TabButton title="TV Series" isActive={contentTypeFilter === 'tv'} onClick={() => setContentTypeFilter('tv')} theme={theme.tv} />
-        </div>
+        {/* Content Type Selector */}
+        <ContentTypeSelector
+            contentTypeFilter={contentTypeFilter}
+            setContentTypeFilter={setContentTypeFilter}
+            theme={theme}
+        />
 
-        {/* Time Filter Selector (Overall / This Year / This Month) */}
-        <div className="flex justify-center space-x-2 md:space-x-4 mb-6">
+        {/* Time Filter Selector */}
+        <div className="flex justify-center space-x-2 md:space-x-4 mb-8">
           <StatsFilterButton title="Overall stats" isActive={timeFilter === 'overall'} onClick={() => setTimeFilter('overall')} theme={activeTheme} />
           <StatsFilterButton title="This year" isActive={timeFilter === 'year'} onClick={() => setTimeFilter('year')} theme={activeTheme} />
           <StatsFilterButton title="This month" isActive={timeFilter === 'month'} onClick={() => setTimeFilter('month')} theme={activeTheme} />
         </div>
 
-        {/* --- Stats Section --- */}
+        {/* --- Stats Grid --- */}
         <div className="mb-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {/* Column 1 */}
-            <StatCard
-              title="Watch Count" 
-              value={currentStats.completedCount} 
-              theme={activeTheme}
-            />
-
-            <StatCard 
-              title="Avg. Rate" 
-              value={currentStats.avgRating ? currentStats.avgRating.toFixed(1) : "0.0"} 
-              theme={activeTheme}
-            />
-
-            <StatCard 
-              title="Best Rated" 
-              value={currentStats.best || "N/A"}
-              theme={activeTheme} 
-            />
-
-            <StatCard 
-              title="Best Rate" 
-              value={currentStats.highestRating ? `${currentStats.highestRating}` : "N/A"}
-              theme={activeTheme} 
-            />
-
-            {/* Column 2 */}
-            <StatCard 
-              title="Worst Rated" 
-              value={currentStats.worst || "N/A"}
-              theme={activeTheme}
-            />
-
-            <StatCard 
-              title="Worst Rate" 
-              value={currentStats.lowestRating ? `${currentStats.lowestRating}` : "N/A"} 
-              theme={activeTheme}
-            />
-
-            <StatCard
-              title="Favorite Genre" 
-              value={currentStats.favoriteGenre || "N/A"} 
-              theme={activeTheme}
-            />
-
-            <StatCard
-              title="Watch Time" 
-              value={formatWatchTime(currentStats.totalHours || 0)} 
-              theme={activeTheme}
-            />
+          <div className="grid grid-cols-2 gap-4">
+            {contentTypeFilter === 'movie' ? (
+              <>
+                <StatCard title="Watch count" value={mainStats.watchCount ?? 'N/A'} />
+                <StatCard title="Avg. rate" value={formatRating(mainStats.avgRate)} />
+                <StatCard title="Best rated movie" value={mainStats.bestRatedMovie ?? 'N/A'} />
+                <StatCard title="Best rate" value={formatRating(mainStats.bestRate)} />
+                <StatCard title="Worst rated movie" value={mainStats.worstRatedMovie ?? 'N/A'} />
+                <StatCard title="Worst rate" value={formatRating(mainStats.worstRate)} />
+                <StatCard title="Favorite genre" value={mainStats.favoriteGenre ?? 'N/A'} />
+                <StatCard title="Watch time" value={formatWatchTime(mainStats.watchTime)} />
+              </>
+            ) : (
+              <>
+                <StatCard title="Seasons watched" value={mainStats.watchCount ?? 'N/A'} />
+                <StatCard title="Avg. rate" value={formatRating(mainStats.avgRate)} />
+                <StatCard title="Best rated TV series" value={mainStats.bestRatedTVSeries ?? 'N/A'} />
+                <StatCard title="Best rate" value={formatRating(mainStats.bestRate)} />
+                <StatCard title="Worst rated TV series" value={mainStats.worstRatedTVSeries ?? 'N/A'} />
+                <StatCard title="Worst rate" value={formatRating(mainStats.worstRate)} />
+                <StatCard title="Favorite genre" value={mainStats.favoriteGenre ?? 'N/A'} />
+                <StatCard title="Episodes watched" value={mainStats.episodesWatched ?? 'N/A'} />
+                <StatCard title="TV series watched" value={mainStats.tvSeriesWatched ?? 'N/A'} />
+                <StatCard title="Watch time" value={formatWatchTime(mainStats.watchTime)} />
+              </>
+            )}
           </div>
         </div>
 
-
         {/* --- Daily Activity Chart --- */}
         <div className="bg-gray-800 p-4 rounded-lg mb-8">
-            <h3 className="text-xl font-bold mb-4">Your daily activity</h3>
-            <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={currentStats.dailyActivity} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                    <XAxis type="number" stroke="#9ca3af" />
-                    <YAxis type="category" dataKey="day" stroke="#9ca3af" axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #4b5563' }} cursor={{ fill: 'rgba(255, 255, 255, 0.1)' }} />
-                    <Bar dataKey="count" barSize={20} radius={[0, 0, 0, 0]}>
-                        {currentStats.dailyActivity.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={activeTheme.fill} />
-                        ))}
-                    </Bar>
-                </BarChart>
-            </ResponsiveContainer>
+          <h3 className="text-xl font-bold mb-4">Your daily activity</h3>
+          <ResponsiveContainer width="100%" height={250}>
+            <BarChart data={dailyActivity} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+              <XAxis type="number" stroke="#9ca3af" domain={[0, 'dataMax + 1']} allowDecimals={false} />
+              <YAxis type="category" dataKey="day" stroke="#9ca3af" width={40} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #4b5563' }} cursor={{ fill: 'rgba(255, 255, 255, 0.1)' }} />
+              <Bar dataKey="count" barSize={15}>
+                {dailyActivity.map((_, index) => (
+                  <Cell key={`cell-${index}`} fill={activeTheme.fill} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
         </div>
 
         {/* --- Top 5/10 List --- */}
         <div className="mt-8">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xl font-bold">Your top {showAllTop ? 10 : 5}</h3>
-            {currentStats.topRated && currentStats.topRated.length > 5 && (
+            {top10.length > 5 && (
               <button
                 onClick={() => setShowAllTop(!showAllTop)}
                 className="px-3 py-1 rounded-lg font-semibold bg-gray-700 hover:bg-gray-600 transition-colors duration-200 text-sm"
@@ -187,23 +180,19 @@ function Dashboard() {
               </button>
             )}
           </div>
-
           <div className="space-y-3">
-            {(currentStats.topRated || []).slice(0, showAllTop ? 10 : 5).map((item, index) => (
-              <div
-                key={item._id || `${item.title}-${index}`}
-                className="flex items-center justify-between bg-gray-800 p-3 rounded-lg"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="text-gray-400 font-bold w-8 text-center">{index + 1}</span>
-                  <p className="truncate">{item.title}</p>
+            {topList.map((item, index) => (
+              <div key={item.id || item.title} className="flex items-center justify-between bg-gray-800 p-3 rounded-lg">
+                <div className="flex items-center gap-4 min-w-0">
+                  <span className="text-gray-400 font-bold w-6 text-center text-lg">{index + 1}</span>
+                  <p className="truncate font-medium">{item.title}</p>
                 </div>
-                <span className={`font-bold text-lg px-3 py-1 rounded ${activeTheme.bg} text-gray-900`}>
+                <span className={`font-bold text-lg px-3 py-1 rounded-md ${activeTheme.bg} text-gray-900`}>
                   {formatRating(item.rating)}
                 </span>
               </div>
             ))}
-            {(!currentStats.topRated || currentStats.topRated.length === 0) && (
+            {topList.length === 0 && (
               <p className="text-gray-400 text-center">No rated items available for this period.</p>
             )}
           </div>
@@ -213,52 +202,39 @@ function Dashboard() {
   );
 }
 
-// --- Sub-components (unchanged from your previous version, included for completeness) ---
+// --- Reusable Sub-components ---
+
+const ContentTypeSelector = ({ contentTypeFilter, setContentTypeFilter, theme }) => (
+    <div className="flex justify-center border-b border-gray-700 mb-6 sticky top-0 bg-[var(--color-background-primary)] z-10 py-2">
+        <TabButton title="Movies" isActive={contentTypeFilter === 'movie'} onClick={() => setContentTypeFilter('movie')} theme={theme.movie} />
+        <TabButton title="TV Series" isActive={contentTypeFilter === 'tv'} onClick={() => setContentTypeFilter('tv')} theme={theme.tv} />
+    </div>
+);
+
 const TabButton = ({ title, isActive, onClick, theme }) => (
-  <button
-    onClick={onClick}
-    className={`px-4 py-2 text-lg font-semibold transition-colors duration-300 ${isActive ? `${theme.mainText} border-b-2 ${theme.border}` : 'text-gray-400 border-b-2 border-transparent hover:text-white'}`}
-  >
+  <button onClick={onClick} className={`px-4 py-2 text-lg font-semibold transition-colors duration-300 ${isActive ? `${theme.mainText} border-b-2 ${theme.border}` : "text-gray-400 border-b-2 border-transparent hover:text-white"}`}>
     {title}
   </button>
 );
 
 const StatsFilterButton = ({ title, isActive, onClick, theme }) => (
-  <button
-    onClick={onClick}
-    className={`px-4 py-2 rounded-full text-sm md:text-base font-semibold transition-colors duration-300 ${isActive ? `${theme.bg} text-white` : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
-  >
+  <button onClick={onClick} className={`px-4 py-2 rounded-full text-sm md:text-base font-semibold transition-colors duration-300 ${isActive ? `${theme.bg} text-white` : "bg-gray-700 text-gray-300 hover:bg-gray-600"}`}>
     {title}
   </button>
 );
 
-const StatCard = ({ icon, title, value, subValue, theme }) => ( // Add 'theme' prop here
-  <div className="bg-gray-800 p-4 rounded-lg col-span-1 md:col-span-2 flex flex-col justify-between">
-    <div className="flex items-start justify-between">
-        <div>
-            <p className="text-gray-400 text-sm">{title}</p>
-            <p className={`text-2xl font-bold mt-1 ${theme ? theme.mainText : 'text-white'}`}>{value}</p> 
-        </div>
-        {icon && <div className="text-gray-500">{icon}</div>}
-    </div>
-    {subValue && <p className="text-gray-500 text-xs mt-2 truncate">{subValue}</p>}
+const StatCard = ({ title, value }) => (
+  <div className="bg-gray-800 p-4 rounded-lg flex flex-col justify-center min-h-[90px]">
+    <p className="text-gray-400 text-sm">{title}</p>
+    <p className="text-2xl font-bold mt-1 text-white truncate">{value ?? 'N/A'}</p>
   </div>
 );
 
-// --- Helper: format minutes into Xd Yh Zm ---
-function formatWatchTime(totalMinutes) {
-  if (!totalMinutes || totalMinutes <= 0) return "0m";
-  const days = Math.floor(totalMinutes / (60 * 24));
-  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
-  const minutes = totalMinutes % 60;
-  return `${days > 0 ? days + "d " : ""}${hours > 0 ? hours + "h " : ""}${minutes > 0 ? minutes + "m" : ""}`.trim();
-}
-
-// Format rating like "10" or "9.8"
+// --- Helper to format rating display ---
 function formatRating(r) {
-  if (r == null) return "N/A";
-  const s = Number(r).toFixed(1);
-  return s.endsWith(".0") ? s.slice(0, -2) : s;
+  if (r == null || isNaN(r)) return "N/A";
+  const num = Number(r);
+  return num % 1 === 0 ? num.toString() : num.toFixed(1);
 }
 
 export default Dashboard;
