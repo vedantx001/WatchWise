@@ -5,7 +5,6 @@ import api from "../api";
 import "../styles/moviedetails.css";
 import fallbackPoster from "../assets/fallback_poster2.png";
 
-/** Small UI helpers */
 const InfoPill = ({ label, value, icon }) => (
   <div className="info-pill text-white">
     <div className="flex items-center gap-2">
@@ -16,29 +15,54 @@ const InfoPill = ({ label, value, icon }) => (
   </div>
 );
 
-const RatingCircle = ({ percentage = 0, size = 60 }) => {
-  const radius = 25;
-  const circumference = 2 * Math.PI * radius;
-  const pct = Math.max(0, Math.min(100, Math.round(percentage || 0)));
-  const offset = circumference - (pct / 100) * circumference;
-  const color = pct >= 70 ? "#22c55e" : pct >= 40 ? "#eab308" : "#ef4444";
+const PremiumRating = ({ rating = 0 }) => {
+  const normalizedRating = Math.min(10, Math.max(0, rating));
+  const percentage = (normalizedRating / 10) * 100;
+  const bars = 10;
+
+  const getGradeInfo = () => {
+    if (percentage >= 85) return { grade: 'S', label: 'Exceptional', class: 'rating-exceptional' };
+    if (percentage >= 75) return { grade: 'A', label: 'Excellent', class: 'rating-excellent' };
+    if (percentage >= 65) return { grade: 'B', label: 'Good', class: 'rating-good' };
+    if (percentage >= 50) return { grade: 'C', label: 'Average', class: 'rating-average' };
+    return { grade: 'D', label: 'Below', class: 'rating-below' };
+  };
+
+  const gradeInfo = getGradeInfo();
+
   return (
-    <div
-      className="rating-circle"
-      style={{ width: size, height: size, "--progress-color": color }}
-    >
-      <svg width={size} height={size}>
-        <circle className="circle-bg" cx={size / 2} cy={size / 2} r={radius} />
-        <circle
-          className="circle-progress"
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-        />
-      </svg>
-      <span className="rating-text">{pct}%</span>
+    <div className={`premium-rating ${gradeInfo.class}`}>
+      <div className="rating-header">
+        <div className="rating-grade-circle">
+          <span className="grade-letter">{gradeInfo.grade}</span>
+        </div>
+        <div className="rating-info">
+          <div className="rating-label">{gradeInfo.label}</div>
+          <div className="rating-score">
+            <span className="score-value">{normalizedRating.toFixed(1)}</span>
+            <span className="score-divider">/</span>
+            <span className="score-max">10</span>
+          </div>
+        </div>
+      </div>
+      <div className="rating-bars">
+        {[...Array(bars)].map((_, i) => {
+          const isActive = i < Math.round(normalizedRating);
+            const isPartial = i === Math.floor(normalizedRating) && normalizedRating % 1 !== 0;
+          return (
+            <div
+              key={i}
+              className={`rating-bar ${isActive ? 'active' : ''}`}
+              style={{
+                animationDelay: `${i * 0.05}s`,
+                opacity: isPartial ? normalizedRating % 1 : undefined
+              }}
+            >
+              <div className="bar-fill"></div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };
@@ -51,23 +75,17 @@ const formatRuntime = (m) => {
 };
 
 export default function SeasonDetails() {
-  // IMPORTANT: these names must match your route: /details/tv/:id/season/:seasonNumber
   const { id, seasonNumber } = useParams();
   const navigate = useNavigate();
 
   const [season, setSeason] = useState(null);
   const [show, setShow] = useState(null);
 
-  // The single watchlist "show doc" (contentType: "tv") that holds seasons[]
   const [watchDoc, setWatchDoc] = useState(null);
-
-  // UI state
   const [adding, setAdding] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [expanded, setExpanded] = useState(null);
   const [watchedCount, setWatchedCount] = useState(0);
-
-  // ---- Load TMDB info + watchlist doc ----
   useEffect(() => {
     let mounted = true;
 
@@ -77,7 +95,6 @@ export default function SeasonDetails() {
 
     const load = async () => {
       try {
-        // Load show + season from TMDB
         const [tvShow, sea] = await Promise.all([
           fetchTvShowDetails(id),
           fetchSeasonDetails(id, seasonNumber),
@@ -86,14 +103,12 @@ export default function SeasonDetails() {
         setShow(tvShow);
         setSeason(sea);
 
-        // Try to load the watchlist "tv show" doc by TMDB id
         let doc = null;
         try {
           const res = await api.get(`/movies/by-tmdb/tv/${id}`, withAuth);
           if (!mounted) return;
           doc = res.data || null;
         } catch {
-          // Fallback: fetch all and pick matching tv doc (if /by-tmdb route doesn't exist)
           try {
             const all = await api.get("/movies", withAuth);
             if (!mounted) return;
@@ -106,29 +121,7 @@ export default function SeasonDetails() {
           }
         }
 
-        // If doc exists but the requested season entry is missing, ensure it exists as "planned"
-        if (doc) {
-          const sn = Number(seasonNumber);
-          const hasSeason = (doc.seasons || []).some((s) => s.seasonNumber === sn);
-          if (!hasSeason) {
-            try {
-              const ensured = await api.put(
-                `/movies/${doc._id}/season/${sn}`,
-                { status: "planned" },
-                withAuth
-              );
-              if (!mounted) return;
-              setWatchDoc(ensured.data);
-            } catch {
-              if (!mounted) return;
-              setWatchDoc(doc);
-            }
-          } else {
-            setWatchDoc(doc);
-          }
-        } else {
-          setWatchDoc(null);
-        }
+        setWatchDoc(doc);
       } catch (err) {
         console.error("Failed to load season/show:", err);
       }
@@ -142,7 +135,6 @@ export default function SeasonDetails() {
 
   const episodesCount = season?.episodes?.length || 0;
 
-  // Get just this season entry from the watchlist doc (if any)
   const thisSeasonInDoc = useMemo(() => {
     if (!watchDoc) return null;
     const found = (watchDoc.seasons || []).find(
@@ -163,7 +155,6 @@ export default function SeasonDetails() {
     );
   }
 
-  // Build poster/backdrop URLs with safe fallback
   const poster = season.poster_path
     ? `https://image.tmdb.org/t/p/w500${season.poster_path}`
     : show.poster_path
@@ -175,59 +166,27 @@ export default function SeasonDetails() {
     : "";
 
   const genres = (show.genres || []).map((g) => g.name);
-  const ratingPct = Math.round(
-    (season.vote_average || show.vote_average || 0) * 10
-  );
+  const ratingValue = season.vote_average || show.vote_average || 0;
   const episodeRuntime =
     season.episodes?.[0]?.runtime || (show.episode_run_time?.[0] ?? null);
 
   const currentStatus = thisSeasonInDoc?.status || "planned";
 
-  // ---- Write helpers ----
-
-  // Create a new TV show doc if none exists, then ensure this season exists as "planned"
-  const ensureDocAndSeason = async () => {
-    const withAuth = {
-      headers: { "x-auth-token": localStorage.getItem("token") || "" },
-    };
-
-    let doc = watchDoc;
-
-    // Create base doc if missing
-    if (!doc) {
-      const createPayload = {
-        title: show.name,
-        tmdbId: String(show.id),
-        contentType: "tv",
-        status: "planned",
-        // Stores absolute URL; your Watchlist's withPosterUrl handles absolute vs TMDB path
-        posterPath: poster,
-        rating: show.vote_average || 0,
-      };
-      const created = await api.post("/movies", createPayload, withAuth);
-      doc = created.data;
-    }
-
-    // Ensure the season exists
-    const sn = Number(seasonNumber);
-    const hasSeason = (doc.seasons || []).some((s) => s.seasonNumber === sn);
-    if (!hasSeason) {
-      const updated = await api.put(
-        `/movies/${doc._id}/season/${sn}`,
-        { status: "planned" },
-        withAuth
-      );
-      return updated.data;
-    }
-    return doc;
-  };
-
   const addSeasonToWatchlist = async () => {
     if (adding) return;
     setAdding(true);
     try {
-      const data = await ensureDocAndSeason();
-      setWatchDoc(data);
+      const withAuth = {
+        headers: { "x-auth-token": localStorage.getItem("token") || "" },
+      };
+      const payload = {
+        tmdbId: String(show.id),
+        contentType: "tv",
+        seasonNumber: Number(seasonNumber),
+        status: "planned",
+      };
+      const res = await api.post("/movies", payload, withAuth);
+      setWatchDoc(res.data); // backend returns the whole show doc
       alert(`Season ${seasonNumber} added to watchlist!`);
     } catch (e) {
       const msg =
@@ -244,17 +203,28 @@ export default function SeasonDetails() {
     if (updatingStatus) return;
     setUpdatingStatus(true);
     try {
-      // Make sure we have a doc and season first
-      let doc = watchDoc;
-      if (!doc || !thisSeasonInDoc) {
-        doc = await ensureDocAndSeason();
-        setWatchDoc(doc);
+      const withAuth = {
+        headers: { "x-auth-token": localStorage.getItem("token") || "" },
+      };
+
+      // If the show or season doesn't exist yet, create with requested status
+      if (!watchDoc || !thisSeasonInDoc) {
+        const payload = {
+          tmdbId: String(show.id),
+          contentType: "tv",
+          seasonNumber: Number(seasonNumber),
+          status,
+        };
+        const created = await api.post("/movies", payload, withAuth);
+        setWatchDoc(created.data);
+        return;
       }
 
+      // Otherwise just update the season status
       const res = await api.put(
-        `/movies/${doc._id}/season/${seasonNumber}`,
+        `/movies/${watchDoc._id}/season/${seasonNumber}`,
         { status },
-        { headers: { "x-auth-token": localStorage.getItem("token") || "" } }
+        withAuth
       );
       setWatchDoc(res.data);
     } catch (e) {
@@ -268,18 +238,13 @@ export default function SeasonDetails() {
     }
   };
 
-  // Local-only progress controls (not persisted)
   const decProgress = () => setWatchedCount((v) => Math.max(0, v - 1));
   const incProgress = () =>
     setWatchedCount((v) => Math.min(episodesCount, v + 1));
-
-  // Prefer season credits; fallback to show credits
   const cast =
     season?.credits?.cast?.length
       ? season.credits.cast
       : show?.credits?.cast || [];
-
-  // ---- Desktop layout ----
   const Desktop = (
     <div
       className="backdrop-container min-h-screen hidden md:block"
@@ -305,19 +270,16 @@ export default function SeasonDetails() {
                 <h1 className="text-4xl font-bold text-white">
                   {show.name} — Season {seasonNumber}
                 </h1>
-                {ratingPct > 0 ? (
+                {ratingValue > 0 && (
                   <div className="shrink-0">
-                    <RatingCircle percentage={ratingPct} />
+                    <PremiumRating rating={ratingValue} />
                   </div>
-                ) : null}
+                )}
               </div>
 
-              {/* spacer for layout consistency */}
               <div className="text"></div>
 
               <div className="flex flex-wrap items-center gap-3 mt-3 text-gray-200">
-                {episodeRuntime ? <span>{formatRuntime(episodeRuntime)}</span> : null}
-                <span className="opacity-60">•</span>
                 <span>{episodesCount} episodes</span>
                 {genres.length ? (
                   <>
@@ -374,24 +336,10 @@ export default function SeasonDetails() {
                     )}
                   </>
                 )}
-                <button
-                  onClick={() =>
-                    window.open(
-                      `https://www.justwatch.com/search?q=${encodeURIComponent(
-                        show.name
-                      )}`,
-                      "_blank"
-                    )
-                  }
-                  className="bg-white/10 text-white font-semibold px-6 py-3 rounded-lg hover:bg-white/20 transition cursor-pointer"
-                >
-                  Where to watch?
-                </button>
               </div>
             </div>
           </div>
 
-          {/* Cast */}
           {cast?.length ? (
             <div className="mt-8">
               <h3 className="text-xl font-semibold mb-3 text-white">
@@ -434,7 +382,6 @@ export default function SeasonDetails() {
             </div>
           ) : null}
 
-          {/* Episodes list */}
           <div className="mt-8">
             <h3 className="text-xl font-semibold mb-3 text-white">Episodes</h3>
             <div className="space-y-3 max-h-[60vh] overflow-auto pr-1">
@@ -480,7 +427,6 @@ export default function SeasonDetails() {
     </div>
   );
 
-  // ---- Mobile layout ----
   const Mobile = (
     <div
       className="md:hidden"
@@ -490,7 +436,6 @@ export default function SeasonDetails() {
     >
       <div className="backdrop-overlay">
         <div className="px-4 pt-4 pb-24 max-w-3xl mx-auto">
-          {/* Header */}
           <div className="flex items-center justify-between text-white">
             <button
               onClick={() => navigate(-1)}
@@ -503,10 +448,7 @@ export default function SeasonDetails() {
             <div className="opacity-0">.</div>
           </div>
 
-          {/* spacer for layout consistency */}
           <div className="text"></div>
-
-          {/* Top: poster + info pills */}
           <div className="grid grid-cols-12 gap-3 mt-4">
             <div className="col-span-7">
               <img
@@ -541,7 +483,6 @@ export default function SeasonDetails() {
             </div>
           </div>
 
-          {/* Title + season + status */}
           <div className="mt-6 text-white">
             <h1 className="text-3xl font-extrabold">{show.name}</h1>
             <div className="text-xl opacity-90 mt-1">Season {seasonNumber}</div>
@@ -565,7 +506,6 @@ export default function SeasonDetails() {
                       : "Completed"}
                   </span>
 
-                  {/* Quick actions */}
                   {currentStatus !== "watching" && (
                     <button
                       onClick={() => setSeasonStatus("watching")}
@@ -601,30 +541,15 @@ export default function SeasonDetails() {
             </div>
           </div>
 
-          {/* Overview + where to watch */}
           <div className="mt-6 text-white">
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-semibold">Overview</h3>
-              <button
-                onClick={() =>
-                  window.open(
-                    `https://www.justwatch.com/search?q=${encodeURIComponent(
-                      show.name
-                    )}`,
-                    "_blank"
-                  )
-                }
-                className="px-3 py-2 rounded-xl border border-cyan-400 text-cyan-400 cursor-pointer"
-              >
-                Where to watch?
-              </button>
             </div>
             <p className="text-gray-200 mt-2">
               {season.overview || "No overview available."}
             </p>
           </div>
 
-          {/* Main actors */}
           {cast?.length ? (
             <div className="mt-8">
               <h3 className="text-xl font-semibold mb-3 text-white">
@@ -667,41 +592,8 @@ export default function SeasonDetails() {
             </div>
           ) : null}
 
-          {/* Episodes */}
           <div className="mt-8 text-white">
             <h3 className="text-xl font-semibold">Episodes</h3>
-
-            {/* Simple (local) progress UI */}
-            <div className="mt-3 bg-white/10 rounded-full px-4 py-2 flex items-center gap-3">
-              <div className="w-16 text-center font-bold">
-                {watchedCount}/{episodesCount}
-              </div>
-              <div className="flex-1 h-2 bg-white/20 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-cyan-400"
-                  style={{
-                    width: `${
-                      episodesCount
-                        ? (watchedCount / episodesCount) * 100
-                        : 0
-                    }%`,
-                  }}
-                />
-              </div>
-              <button
-                className="w-8 h-8 rounded-full bg-white/10 cursor-pointer"
-                onClick={decProgress}
-              >
-                –
-              </button>
-              <button
-                className="w-8 h-8 rounded-full bg-white/10 cursor-pointer"
-                onClick={incProgress}
-              >
-                +
-              </button>
-            </div>
-
             <div className="space-y-3 mt-3">
               {season.episodes?.map((ep) => {
                 const open = expanded === ep.episode_number;
@@ -747,44 +639,48 @@ export default function SeasonDetails() {
               })}
             </div>
           </div>
-
-          {/* Sticky CTA */}
-          {thisSeasonInDoc ? (
-            currentStatus === "planned" ? (
-              <button
-                className="sticky-cta secondary cursor-pointer"
-                onClick={() => setSeasonStatus("watching")}
-                disabled={updatingStatus}
-              >
-                👀 Start watching
-              </button>
-            ) : currentStatus === "watching" ? (
-              <button
-                className="sticky-cta cursor-pointer"
-                onClick={() => setSeasonStatus("completed")}
-                disabled={updatingStatus}
-              >
-                ⏱️ Finish watching
-              </button>
-            ) : null
-          ) : (
-            <button
-              className="sticky-cta secondary cursor-pointer"
-              onClick={addSeasonToWatchlist}
-              disabled={adding || updatingStatus}
-            >
-              ➕ Add season to watchlist
-            </button>
-          )}
         </div>
       </div>
     </div>
+  );
+
+  const StickyCTA = (
+    <>
+      {thisSeasonInDoc ? (
+        currentStatus === "planned" ? (
+          <button
+            className="sticky-cta secondary cursor-pointer md:hidden"
+            onClick={() => setSeasonStatus("watching")}
+            disabled={updatingStatus}
+          >
+            👀 Start watching
+          </button>
+        ) : currentStatus === "watching" ? (
+          <button
+            className="sticky-cta cursor-pointer md:hidden"
+            onClick={() => setSeasonStatus("completed")}
+            disabled={updatingStatus}
+          >
+            ⏱️ Finish watching
+          </button>
+        ) : null
+      ) : (
+        <button
+          className="sticky-cta secondary cursor-pointer md:hidden"
+          onClick={addSeasonToWatchlist}
+          disabled={adding || updatingStatus}
+        >
+          ➕ Add season to watchlist
+        </button>
+      )}
+    </>
   );
 
   return (
     <>
       {Desktop}
       {Mobile}
+  {StickyCTA}
     </>
   );
 }

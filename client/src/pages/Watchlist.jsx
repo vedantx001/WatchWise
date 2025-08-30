@@ -3,26 +3,22 @@ import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import api from "../api";
 import SearchBar from "../components/SearchBar";
 import fallbackPoster from "../assets/fallback_poster2.png";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import "../styles/watchlist.css";
 
 function Watchlist() {
   const navigate = useNavigate();
 
-  // Data
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // UI State
   const [activeSection, setActiveSection] = useState("movies"); // "movies" | "tv"
   const [movieFilter, setMovieFilter] = useState("all"); // "all" | "planned" | "watching" | "completed"
   const [tvFilter, setTvFilter] = useState("all"); // "all" | "planned" | "watching" | "completed"
 
-  // Mobile: expand/collapse TV show groups
   const [expandedShows, setExpandedShows] = useState(() => new Set());
 
-  // Search modal
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchMode, setSearchMode] = useState("movie"); // "movie" | "tv"
   const openSearch = (mode) => {
@@ -43,13 +39,11 @@ function Watchlist() {
     };
   };
 
-  // Load items
   useEffect(() => {
     reloadWatchlist();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Central reload to sync list after any details-page update
   const reloadWatchlist = useCallback(() => {
     let mounted = true;
     setLoading(true);
@@ -71,7 +65,6 @@ function Watchlist() {
     };
   }, []);
 
-  // Actions
   const clearWatchlist = async () => {
     if (!window.confirm("Clear your entire watchlist? This cannot be undone.")) return;
     await api.delete("/movies/clear");
@@ -108,9 +101,7 @@ function Watchlist() {
     setItems((prev) => prev.map((m) => (m._id === showId ? withPosterUrl(res.data) : m)));
   };
 
-  // Helpers
   const movies = useMemo(() => items.filter((i) => i.contentType === "movie"), [items]);
-
   const filteredMovies = useMemo(
     () => movies.filter((m) => (movieFilter === "all" ? true : m.status === movieFilter)),
     [movies, movieFilter]
@@ -145,6 +136,15 @@ function Watchlist() {
     return { total, completed, percent, watching };
   };
 
+  const computeShowStatus = (show) => {
+    const seasons = show.seasons || [];
+    if (!seasons.length) return "planned";
+    const allCompleted = seasons.every((s) => s.status === "completed");
+    if (allCompleted) return "completed";
+    if (seasons.some((s) => s.status === "watching")) return "watching";
+    return "planned";
+  };
+
   const formatDate = (d) => {
     if (!d) return "";
     try {
@@ -169,7 +169,7 @@ function Watchlist() {
     return `${label} ${formatDate(base)}`;
   };
 
-  // Animations and variants (desktop cards)
+  // Animations and variants
   const cardVariants = {
     initial: { opacity: 0, y: 20, scale: 0.98 },
     animate: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.35, ease: [0.22, 1, 0.36, 1] } },
@@ -194,83 +194,6 @@ function Watchlist() {
     );
   };
 
-  const SeasonChips = ({ show }) => {
-    const seasons = show.seasons || [];
-    if (!seasons.length) {
-      return <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>No seasons added yet.</p>;
-    }
-    return (
-      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-        {seasons.map((s) => (
-          <div
-            key={s.seasonNumber}
-            className={`w-full text-left px-3 py-2 rounded-xl border transition relative overflow-hidden hover:bg-opacity-80`}
-            style={{
-              background: "var(--color-background-secondary)",
-              borderColor:
-                s.status === "completed" || s.status === "watching"
-                  ? "var(--color-accent)"
-                  : "var(--color-background-secondary)",
-            }}
-          >
-            <div
-              className="absolute inset-0 pointer-events-none opacity-30"
-              style={{
-                background:
-                  "radial-gradient(600px circle at var(--mx, 50%) var(--my, 50%), rgba(127,127,127,0.1), transparent 40%)",
-              }}
-            />
-            <div
-              onMouseMove={(e) => {
-                const r = e.currentTarget.getBoundingClientRect();
-                const x = e.clientX - r.left;
-                const y = e.clientY - r.top;
-                e.currentTarget.style.setProperty("--mx", `${x}px`);
-                e.currentTarget.style.setProperty("--my", `${y}px`);
-              }}
-              className="relative z-10"
-            >
-              <div className="flex items-center justify-between">
-                <span
-                  className="font-semibold cursor-pointer hover:underline"
-                  onClick={() => navigate(`/details/tv/${show.tmdbId}/season/${s.seasonNumber}`)}
-                  style={{ color: "var(--color-text-primary)" }}
-                >
-                  Season {s.seasonNumber}
-                </span>
-                <span className="text-xs opacity-80" style={{ color: "var(--color-text-secondary)" }}>
-                  {s.episodeCount} eps
-                </span>
-              </div>
-              <div className="text-xs mt-1 opacity-80 mb-2" style={{ color: "var(--color-text-secondary)" }}>
-                {s.status === "completed" ? " Completed" : s.status === "watching" ? "Watching" : "Planned"}
-              </div>
-              {/* On mobile, status changes are performed on the details page; keep quick actions for desktop only */}
-              {s.status === "planned" && (
-                <button
-                  onClick={() => startWatchingSeason(show._id, s.seasonNumber)}
-                  className="px-3 py-1 text-xs rounded font-semibold shadow mr-2 mb-1 wl-hide-on-mobile"
-                  style={{ background: "var(--color-accent)", color: "#fff" }}
-                >
-                  🎬 Start
-                </button>
-              )}
-              {s.status === "watching" && (
-                <button
-                  onClick={() => completeSeason(show._id, s.seasonNumber)}
-                  className="px-3 py-1 text-xs rounded font-semibold shadow mr-2 mb-1 wl-hide-on-mobile"
-                  style={{ background: "var(--color-accent)", color: "#fff" }}
-                >
-                  Done
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
   const ActionIcon = ({ title, onClick, children, danger = false }) => (
     <motion.button
       title={title}
@@ -282,226 +205,13 @@ function Watchlist() {
         background: danger ? "transparent" : "var(--color-background-secondary)",
         color: danger ? "var(--color-accent)" : "var(--color-text-primary)",
         borderColor: danger ? "var(--color-accent)" : "var(--color-background-secondary)",
+        cursor: "pointer",
       }}
     >
       {children}
     </motion.button>
   );
 
-  // DESKTOP card (unchanged)
-  const MediaCard = ({ m, isTV = false }) => {
-    const prog = isTV ? showProgress(m) : null;
-
-    return (
-      <motion.article
-        layout
-        variants={cardVariants}
-        initial="initial"
-        animate="animate"
-        exit="exit"
-        whileHover={{ y: -6, scale: 1.01 }}
-        className="group relative rounded-3xl overflow-hidden backdrop-blur-sm border shadow-2xl transition-all"
-        style={{
-          background: "var(--color-background-secondary)",
-          borderColor: "var(--color-background-secondary)",
-          color: "var(--color-text-primary)",
-        }}
-      >
-        {/* Poster */}
-        <div className="relative h-64">
-          <img
-            src={m.posterUrl || fallbackPoster}
-            alt={m.title}
-            loading="lazy"
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              e.currentTarget.onerror = null;
-              e.currentTarget.src = fallbackPoster;
-            }}
-          />
-          <div className="absolute top-3 right-3 flex items-center gap-2">
-            <motion.button
-              onClick={() => toggleFavorite(m._id)}
-              whileTap={{ scale: 0.85, rotate: -8 }}
-              animate={m.favorite ? { scale: [1, 1.25, 1], rotate: [0, -10, 0] } : { scale: 1, rotate: 0 }}
-              transition={{ duration: 0.35 }}
-              className="text-3xl drop-shadow"
-              title={m.favorite ? "Unfavorite" : "Favorite"}
-              aria-label={m.favorite ? "Unfavorite" : "Favorite"}
-              style={{
-                color: m.favorite ? "var(--color-accent)" : "var(--color-text-secondary)",
-              }}
-            >
-              {m.favorite ? "♥" : "♡"}
-            </motion.button>
-          </div>
-
-          {/* Gradient overlays */}
-          <div
-            className="absolute inset-x-0 bottom-0 h-24"
-            style={{ background: "linear-gradient(to top, rgba(0,0,0,0.7), transparent)" }}
-          />
-        </div>
-
-        {/* Details */}
-        <div className="p-5 flex flex-col gap-3">
-          <div className="flex items-start justify-between gap-3">
-            <h4 className="text-lg sm:text-xl font-bold leading-tight line-clamp-2">
-              {m.title}
-            </h4>
-            {!isTV && <StatusPill status={m.status} />}
-            {isTV && (
-              <span className="text-xs opacity-80" style={{ color: "var(--color-text-secondary)" }}>
-                {prog.completed}/{prog.total} seasons
-              </span>
-            )}
-          </div>
-          <p className="text-xs opacity-70" style={{ color: "var(--color-text-secondary)" }}>
-            Added on {new Date(m.createdAt).toLocaleDateString()}
-          </p>
-
-          {!isTV ? (
-            <AnimatePresence mode="wait">
-              {m.status === "planned" && (
-                <motion.div
-                  key="start"
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  className="flex items-center gap-2 wl-hide-on-mobile"
-                >
-                  <button
-                    onClick={() => startWatching(m._id)}
-                    className="px-4 py-2 text-sm rounded-lg font-semibold shadow-md transition"
-                    style={{ background: "var(--color-accent)", color: "#fff" }}
-                  >
-                    Start Watching
-                  </button>
-                </motion.div>
-              )}
-              {m.status === "watching" && (
-                <motion.div
-                  key="complete"
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  className="flex items-center gap-2 wl-hide-on-mobile"
-                >
-                  <button
-                    onClick={() => completeWatching(m._id)}
-                    className="px-4 py-2 text-sm rounded-lg font-semibold shadow-md transition"
-                    style={{ background: "var(--color-accent)", color: "#fff" }}
-                  >
-                    Mark Completed
-                  </button>
-                </motion.div>
-              )}
-              {m.status === "completed" && (
-                <motion.p
-                  key="done"
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  className="font-semibold wl-hide-on-mobile"
-                  style={{ color: "var(--color-accent)" }}
-                >
-                  ✔ Completed
-                </motion.p>
-              )}
-            </AnimatePresence>
-          ) : (
-            <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
-              <p className="text-sm mb-2 opacity-80" style={{ color: "var(--color-text-secondary)" }}>
-                Selected seasons:
-              </p>
-              <SeasonChips show={m} />
-            </motion.div>
-          )}
-
-          <div className="flex justify-end gap-2 mt-2">
-            <ActionIcon title="Delete" onClick={() => deleteItem(m._id)} danger>
-              🗑
-            </ActionIcon>
-          </div>
-        </div>
-
-        <div
-          className="pointer-events-none absolute inset-0 rounded-3xl border transition"
-          style={{ borderColor: "var(--color-background-secondary)" }}
-        />
-      </motion.article>
-    );
-  };
-
-  const SkeletonCard = () => (
-    <div
-      className="rounded-3xl overflow-hidden border"
-      style={{ borderColor: "var(--color-background-secondary)", background: "var(--color-background-secondary)" }}
-    >
-      <div className="h-64" style={{ background: "var(--color-background-secondary)" }} />
-      <div className="p-5 space-y-3">
-        <div className="h-5 rounded w-3/4" style={{ background: "var(--color-background-secondary)" }} />
-        <div className="h-3 rounded w-1/2" style={{ background: "var(--color-background-secondary)" }} />
-        <div className="h-9 rounded w-2/3" style={{ background: "var(--color-background-secondary)" }} />
-        <div className="h-9 rounded w-24 ml-auto" style={{ background: "var(--color-background-secondary)" }} />
-      </div>
-    </div>
-  );
-
-  const Segmented = ({ value, onChange, options }) => (
-    <div
-      className="inline-flex items-center gap-1 rounded-full p-1 backdrop-blur"
-      style={{ background: "var(--color-background-secondary)", border: "1px solid var(--color-background-secondary)" }}
-    >
-      {options.map(({ val, label }) => {
-        const active = value === val;
-        return (
-          <button
-            key={val}
-            onClick={() => onChange(val)}
-            className="px-4 sm:px-5 py-2 rounded-full font-semibold transition duration-200 focus:outline-none"
-            style={{
-              background: active ? "var(--color-accent)" : "transparent",
-              color: active ? "#fff" : "var(--color-text-secondary)",
-            }}
-            aria-pressed={active}
-          >
-            {label}
-          </button>
-        );
-      })}
-    </div>
-  );
-
-  // MOBILE TABS (All | Planned | Watching | Completed)
-  const MobileStatusTabs = ({ value, onChange }) => {
-    const options = [
-      { val: "all", label: "All" },
-      { val: "planned", label: "Planned" },
-      { val: "watching", label: "Watching" },
-      { val: "completed", label: "Completed" },
-    ];
-    return (
-      <div className="wl-mobile-only">
-        {options.map((opt) => {
-          const active = value === opt.val;
-          return (
-            <button
-              key={opt.val}
-              className={`wl-tab-btn ${active ? "active" : ""}`}
-              onClick={() => onChange(opt.val)}
-              aria-pressed={active}
-            >
-              {opt.label}
-            </button>
-          );
-        })}
-        <div className="wl-tabs-underline" />
-      </div>
-    );
-  };
-
-  // MOBILE MOVIE ROW
   const MobileMovieRow = ({ m }) => {
     return (
       <div className="wl-row-card">
@@ -538,6 +248,8 @@ function Watchlist() {
           className="wl-chevron"
           aria-label="Open movie"
           onClick={() => navigate(`/details/movie/${m.tmdbId}`)}
+          style={{ cursor: "pointer" }}
+          title="Open movie details"
         >
           ›
         </button>
@@ -545,7 +257,6 @@ function Watchlist() {
     );
   };
 
-  // MOBILE TV SEASON ROW
   const MobileSeasonRow = ({ show, season }) => {
     const episodes = Number(season?.episodeCount) || 0;
     return (
@@ -571,6 +282,8 @@ function Watchlist() {
           className="wl-chevron"
           aria-label="Open season"
           onClick={() => navigate(`/details/tv/${show.tmdbId}/season/${season.seasonNumber}`)}
+          style={{ cursor: "pointer" }}
+          title="Open season details"
         >
           ›
         </button>
@@ -578,7 +291,329 @@ function Watchlist() {
     );
   };
 
-  // MOBILE TV SHOW GROUP (collapsible)
+  const TVDesktopCard = ({ show }) => {
+    const [open, setOpen] = useState(false);
+    const prog = showProgress(show);
+    const showStat = computeShowStatus(show);
+    const seasons = (show.seasons || []).slice().sort((a, b) => a.seasonNumber - b.seasonNumber);
+
+    return (
+      <motion.article
+        layout
+        variants={cardVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        whileHover={{ y: -4, scale: 1.005 }}
+        className="self-start rounded-3xl overflow-hidden border shadow-xl"
+        style={{
+          background: "var(--color-background-secondary)",
+          borderColor: "var(--color-background-secondary)",
+          color: "var(--color-text-primary)",
+        }}
+      >
+        {/* Header */}
+        <div className="w-full text-left">
+          <div className="flex gap-3 p-4">
+            <button
+              onClick={() => navigate(`/details/tv/${show.tmdbId}`)}
+              className="h-20 w-14 object-cover rounded-lg border overflow-hidden"
+              style={{ borderColor: "var(--color-background-primary)", padding:0, cursor:"pointer" }}
+              aria-label={`Open details for ${show.title}`}
+            >
+              <img
+                src={show.posterUrl || fallbackPoster}
+                alt={show.title}
+                className="h-full w-full object-cover"
+                loading="lazy"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = fallbackPoster;
+                }}
+              />
+            </button>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-2">
+                <h4 className="font-bold text-base sm:text-lg line-clamp-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/details/tv/${show.tmdbId}`);
+                    }}
+                    className="hover:underline decoration-2 underline-offset-2 focus:underline focus:outline-none text-left"
+                    style={{ color: "inherit", cursor: "pointer" }}
+                    aria-label={`Open details for ${show.title}`}
+                  >
+                    {show.title}
+                  </button>
+                </h4>
+                <button
+                  onClick={() => setOpen((o) => !o)}
+                  className="ml-1"
+                  aria-expanded={open}
+                  title={open ? "Collapse seasons" : "Expand seasons"}
+                  style={{ color: "var(--color-text-secondary)", cursor: "pointer" }}
+                >
+                  <span className={`inline-block transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
+                </button>
+              </div>
+              <div className="mt-1 flex items-center gap-2 flex-wrap">
+                <StatusPill status={showStat} />
+                <span className="text-xs opacity-80" style={{ color: "var(--color-text-secondary)" }}>
+                  {prog.completed}/{prog.total} seasons • {prog.percent}%
+                </span>
+              </div>
+            </div>
+            <div className="flex items-start gap-2 pl-1">
+              <ActionIcon
+                title={show.favorite ? "Unfavorite" : "Favorite"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleFavorite(show._id);
+                }}
+              >
+                {show.favorite ? "♥" : "♡"}
+              </ActionIcon>
+              <ActionIcon
+                title="Delete"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deleteItem(show._id);
+                }}
+                danger
+              >
+                🗑
+              </ActionIcon>
+            </div>
+          </div>
+        </div>
+
+        {/* Body */}
+        <AnimatePresence initial={false}>
+          {open && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="px-4 pb-4"
+            >
+              {seasons.length ? (
+                <div className="space-y-2">
+                  {seasons.map((s) => (
+                    <MobileSeasonRow key={s.seasonNumber} show={show} season={s} />
+                  ))}
+                </div>
+              ) : (
+                <div
+                  className="rounded-xl p-4 text-sm"
+                  style={{ background: "var(--color-background-primary)", color: "var(--color-text-secondary)" }}
+                >
+                  No seasons added yet.
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.article>
+    );
+  };
+
+  const MovieDesktopCard = ({ m }) => {
+    const [open, setOpen] = useState(false);
+
+    return (
+      <motion.article
+        layout
+        variants={cardVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        whileHover={{ y: -4, scale: 1.005 }}
+        className="self-start rounded-3xl overflow-hidden border shadow-xl"
+        style={{
+          background: "var(--color-background-secondary)",
+          borderColor: "var(--color-background-secondary)",
+          color: "var(--color-text-primary)",
+        }}
+      >
+        {/* Header */}
+        <div className="flex gap-3 p-4">
+          <img
+            src={m.posterUrl || fallbackPoster}
+            alt={m.title}
+            className="h-20 w-14 object-cover rounded-lg border"
+            style={{ borderColor: "var(--color-background-primary)" }}
+            loading="lazy"
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = fallbackPoster;
+            }}
+          />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <h4 className="font-bold text-base sm:text-lg line-clamp-2">
+                <Link
+                  to={`/details/movie/${m.tmdbId}`}
+                  className="hover:underline decoration-2 underline-offset-2 focus:underline focus:outline-none"
+                  style={{ color: "inherit", cursor: "pointer" }}
+                  aria-label={`Open details for ${m.title}`}
+                >
+                  {m.title}
+                </Link>
+              </h4>
+              <button
+                onClick={() => setOpen((o) => !o)}
+                className="ml-2"
+                aria-expanded={open}
+                title={open ? "Collapse" : "Expand"}
+                style={{ color: "var(--color-text-secondary)", cursor: "pointer" }}
+              >
+                <span className={`inline-block transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
+              </button>
+            </div>
+            <div className="mt-1 flex items-center gap-2 flex-wrap">
+              <StatusPill status={m.status} />
+              <span className="text-xs opacity-80" style={{ color: "var(--color-text-secondary)" }}>
+                Added {new Date(m.createdAt).toLocaleDateString()}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-start gap-2 pl-1">
+            <ActionIcon
+              title={m.favorite ? "Unfavorite" : "Favorite"}
+              onClick={() => toggleFavorite(m._id)}
+            >
+              {m.favorite ? "♥" : "♡"}
+            </ActionIcon>
+            <ActionIcon title="Delete" onClick={() => deleteItem(m._id)} danger>
+              🗑
+            </ActionIcon>
+          </div>
+        </div>
+
+        {/* Body */}
+        <AnimatePresence initial={false}>
+          {open && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="px-4 pb-4"
+            >
+              {/* Use the same compact mobile row for a consistent look */}
+              <div className="space-y-2">
+                <MobileMovieRow m={m} />
+                <div className="flex items-center gap-2">
+                  {m.status === "planned" && (
+                    <button
+                      onClick={() => startWatching(m._id)}
+                      className="px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold shadow-md"
+                      style={{ background: "var(--color-accent)", color: "#fff", border: "1px solid var(--color-accent)", cursor: "pointer" }}
+                      title="Start watching"
+                    >
+                      Start Watching
+                    </button>
+                  )}
+                  {m.status === "watching" && (
+                    <button
+                      onClick={() => completeWatching(m._id)}
+                      className="px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold shadow-md"
+                      style={{ background: "var(--color-accent)", color: "#fff", border: "1px solid var(--color-accent)", cursor: "pointer" }}
+                      title="Mark completed"
+                    >
+                      Mark Completed
+                    </button>
+                  )}
+                  {m.status === "completed" && (
+                    <span className="text-sm font-semibold" style={{ color: "var(--color-accent)" }}>
+                      ✔ Completed
+                    </span>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.article>
+    );
+  };
+
+  const SkeletonCard = () => (
+    <div
+      className="rounded-3xl overflow-hidden border"
+      style={{ borderColor: "var(--color-background-secondary)", background: "var(--color-background-secondary)" }}
+    >
+      <div className="h-64" style={{ background: "var(--color-background-secondary)" }} />
+      <div className="p-5 space-y-3">
+        <div className="h-5 rounded w-3/4" style={{ background: "var(--color-background-secondary)" }} />
+        <div className="h-3 rounded w-1/2" style={{ background: "var(--color-background-secondary)" }} />
+        <div className="h-9 rounded w-2/3" style={{ background: "var(--color-background-secondary)" }} />
+        <div className="h-9 rounded w-24 ml-auto" style={{ background: "var(--color-background-secondary)" }} />
+      </div>
+    </div>
+  );
+
+  const Segmented = ({ value, onChange }) => (
+    <div
+      className="inline-flex items-center gap-1 rounded-full p-1 backdrop-blur"
+      style={{ background: "var(--color-background-secondary)", border: "1px solid var(--color-background-secondary)" }}
+    >
+      {[
+        { val: "all", label: "All" },
+        { val: "planned", label: "📝 Planned" },
+        { val: "watching", label: "⏳ Watching" },
+        { val: "completed", label: "✅ Completed" },
+      ].map(({ val, label }) => {
+        const active = value === val;
+        return (
+          <button
+            key={val}
+            onClick={() => onChange(val)}
+            className="px-4 sm:px-5 py-2 rounded-full font-semibold transition duration-200 focus:outline-none"
+            style={{
+              background: active ? "var(--color-accent)" : "transparent",
+              color: active ? "#fff" : "var(--color-text-secondary)",
+              cursor: "pointer",
+            }}
+            aria-pressed={active}
+            title={`Filter: ${label.replace(/^[^a-zA-Z]+/, "")}`}
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const MobileStatusTabs = ({ value, onChange }) => {
+    const options = [
+      { val: "all", label: "All" },
+      { val: "planned", label: "Planned" },
+      { val: "watching", label: "Watching" },
+      { val: "completed", label: "Completed" },
+    ];
+    return (
+      <div className="wl-mobile-only relative">
+        {options.map((opt) => {
+          const active = value === opt.val;
+          return (
+            <button
+              key={opt.val}
+              className={`wl-tab-btn ${active ? "active" : ""}`}
+              onClick={() => onChange(opt.val)}
+              aria-pressed={active}
+              style={{ cursor: "pointer" }}
+              title={`Filter: ${opt.label}`}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+        <div className="wl-tabs-underline" />
+      </div>
+    );
+  };
+
   const MobileTVShowGroup = ({ show, filter }) => {
     const key = show.tmdbId || show._id;
     const isOpen = expandedShows.has(key);
@@ -599,12 +634,31 @@ function Watchlist() {
 
     return (
       <div className="wl-show-group">
-        <button className="wl-show-header" onClick={toggle} aria-expanded={isOpen}>
-          <span className={`wl-caret ${isOpen ? "open" : ""}`}>▾</span>
-          <span className="wl-show-title">{show.title}</span>
-        </button>
+        <div className="wl-show-header" aria-expanded={isOpen}>
+          <button
+            onClick={toggle}
+            className="mr-2"
+            aria-label={isOpen ? "Collapse seasons" : "Expand seasons"}
+            title={isOpen ? "Collapse seasons" : "Expand seasons"}
+            style={{ cursor: "pointer" }}
+          >
+            <span className={`wl-caret ${isOpen ? "open" : ""}`}>▾</span>
+          </button>
+          <button
+            className="wl-show-title text-left flex-1 hover:underline decoration-2 underline-offset-2"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/details/tv/${show.tmdbId}`);
+            }}
+            style={{ cursor: "pointer" }}
+            aria-label={`Open details for ${show.title}`}
+            title={`Open ${show.title}`}
+          >
+            {show.title}
+          </button>
+        </div>
 
-        <AnimatePresence initial={false}>
+  <AnimatePresence initial={false}>
           {isOpen && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
@@ -644,24 +698,18 @@ function Watchlist() {
         </motion.span>
       </motion.div>
 
-      {/* Filters: keep desktop as-is; mobile shows compact tabs */}
+      {/* Filters: desktop segmented + mobile tabs */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mb-6">
         <div className="wl-hide-on-mobile">
           <Segmented
             value={isTV ? tvFilter : movieFilter}
             onChange={isTV ? setTvFilter : setMovieFilter}
-            options={[
-              { val: "all", label: "All" },
-              { val: "planned", label: "📝 Planned" },
-              { val: "watching", label: "⏳ Watching" },
-              { val: "completed", label: "✅ Completed" },
-            ]}
           />
         </div>
         <MobileStatusTabs value={isTV ? tvFilter : movieFilter} onChange={isTV ? setTvFilter : setMovieFilter} />
       </div>
 
-      {/* Mobile list layout only */}
+      {/* Mobile list layout */}
       <div className="wl-mobile-only">
         {!loading && data.length > 0 ? (
           isTV ? (
@@ -689,7 +737,8 @@ function Watchlist() {
             <button
               onClick={() => openSearch(isTV ? "tv" : "movie")}
               className="px-4 py-2 rounded-lg font-semibold shadow-lg"
-              style={{ background: "var(--color-accent)", color: "#fff", border: "1px solid var(--color-accent)" }}
+              style={{ background: "var(--color-accent)", color: "#fff", border: "1px solid var(--color-accent)", cursor: "pointer" }}
+              title={isTV ? "Add TV Series" : "Add movie"}
             >
               {isTV ? "＋ Add TV Series" : "＋ Add movie"}
             </button>
@@ -712,14 +761,14 @@ function Watchlist() {
         )}
       </div>
 
-      {/* Desktop grid layout — exactly as your original */}
+      {/* Desktop grid layout (4 columns) */}
       <div className="wl-hide-on-mobile">
-        <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-start">
           {!loading && data.length > 0 ? (
             <AnimatePresence>
-              {data.map((m) => (
-                <MediaCard key={m._id} m={m} isTV={isTV} />
-              ))}
+              {isTV
+                ? data.map((show) => <TVDesktopCard key={show._id} show={show} />)
+                : data.map((m) => <MovieDesktopCard key={m._id} m={m} />)}
             </AnimatePresence>
           ) : null}
 
@@ -736,7 +785,8 @@ function Watchlist() {
               <button
                 onClick={() => openSearch(isTV ? "tv" : "movie")}
                 className="px-4 py-2 rounded-lg font-semibold shadow-lg"
-                style={{ background: "var(--color-accent)", color: "#fff", border: "1px solid var(--color-accent)" }}
+                style={{ background: "var(--color-accent)", color: "#fff", border: "1px solid var(--color-accent)", cursor: "pointer" }}
+                title={isTV ? "Add TV Series" : "Add movie"}
               >
                 {isTV ? "＋ Add TV Series" : "＋ Add movie"}
               </button>
@@ -759,8 +809,10 @@ function Watchlist() {
         background: "var(--color-accent)",
         color: "#fff",
         border: "1px solid var(--color-accent)",
+        cursor: "pointer",
       }}
       aria-label={label}
+      title={label}
     >
       {label}
     </motion.button>
@@ -798,8 +850,10 @@ function Watchlist() {
                   background: "var(--color-background-secondary)",
                   color: "var(--color-text-primary)",
                   borderColor: "var(--color-background-secondary)",
+                  cursor: "pointer",
                 }}
                 aria-label="Close search"
+                title="Close"
               >
                 ✕
               </button>
@@ -836,7 +890,8 @@ function Watchlist() {
             whileTap={{ scale: 0.96 }}
             aria-label="Clear all watchlist"
             className="px-5 py-2 rounded-lg font-semibold tracking-wide shadow-lg"
-            style={{ background: "var(--color-accent)", color: "#fff", border: "1px solid var(--color-accent)" }}
+            style={{ background: "var(--color-accent)", color: "#fff", border: "1px solid var(--color-accent)", cursor: "pointer" }}
+            title="Clear all"
           >
             🗑️ Clear All
           </motion.button>
@@ -855,8 +910,10 @@ function Watchlist() {
             style={{
               background: activeSection === "movies" ? "var(--color-accent)" : "transparent",
               color: activeSection === "movies" ? "#fff" : "var(--color-text-secondary)",
+              cursor: "pointer",
             }}
             aria-label="Show Movies"
+            title="Show Movies"
           >
             🎥 Movies
           </button>
@@ -866,8 +923,10 @@ function Watchlist() {
             style={{
               background: activeSection === "tv" ? "var(--color-accent)" : "transparent",
               color: activeSection === "tv" ? "#fff" : "var(--color-text-secondary)",
+              cursor: "pointer",
             }}
             aria-label="Show TV Shows"
+            title="Show TV Shows"
           >
             📺 TV Shows
           </button>

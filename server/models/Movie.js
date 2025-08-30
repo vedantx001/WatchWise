@@ -13,7 +13,7 @@ const EpisodeSchema = new mongoose.Schema({
   name: { type: String, default: "" },
   overview: { type: String, default: "" },
   airDate: { type: Date },
-  voteAverage: { type: Number, default: 0 },
+  rating: { type: Number, default: 0 },
 });
 
 const SeasonSchema = new mongoose.Schema({
@@ -33,7 +33,7 @@ const SeasonSchema = new mongoose.Schema({
   posterPath: { type: String, default: null },
   overview: { type: String, default: "" },
   airDate: { type: Date },
-  voteAverage: { type: Number, default: 0 },
+  rating: { type: Number, default: 0 },
 });
 
 const MovieSchema = new mongoose.Schema(

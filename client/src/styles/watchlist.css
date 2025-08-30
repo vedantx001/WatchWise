@@ -26,7 +26,7 @@
   transition: color .2s ease, border-color .2s ease;
 }
 .wl-tab-btn.active {
-  color: #fff;
+  color: var(--color-text-primary); 
   border-color: var(--color-accent);
 }
 .wl-tabs-underline {
@@ -80,7 +80,7 @@
 .wl-row-title {
   font-weight: 800;
   font-size: 1.05rem;
-  color: #fff;
+  color: var(--color-text-primary); /* was #fff */
   line-height: 1.1;
 }
 .wl-row-title.underlined {
@@ -114,13 +114,13 @@
   font-weight: 800;
   font-size: 12px;
   letter-spacing: 0.2px;
-  color: #fff;
+  color: var(--color-text-primary); /* was #fff */
   background: rgba(255,255,255,0.06);
   border: 1px solid transparent;
 }
 .wl-badge.info {
   background: var(--color-accent);
-  color: #fff;
+  color: #fff; /* readable on accent in both themes */
 }
 .wl-badge.planned {
   color: var(--color-text-primary);
@@ -165,13 +165,13 @@
   border: none;
   outline: none;
   background: transparent;
-  color: #fff;
+  color: var(--color-text-primary); /* was #fff */
   padding: 6px 2px;
   font-weight: 800;
   font-size: 1.2rem;
 }
 .wl-show-title {
-  color: #fff;
+  color: var(--color-text-primary); /* was #fff */
 }
 .wl-caret {
   transform: rotate(0deg);
