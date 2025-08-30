@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence, useScroll, useSpring } from "framer-motion";
-import { Layers } from "lucide-react";
+import { Layers, Search, X } from "lucide-react";
 import {
   MagnifyingGlassIcon,
   SunIcon,
@@ -32,6 +32,8 @@ function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [genreModalOpen, setGenreModalOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const searchOverlayRef = useRef(null);
+
 
   // Scroll progress bar
   const { scrollYProgress } = useScroll();
@@ -41,6 +43,29 @@ function Navbar() {
     mass: 0.2,
   });
 
+  const searchVariants = {
+    hidden: {
+      opacity: 0,
+      scale: 0.9,
+      y: -20
+    },
+    visible: {
+      opacity: 1,
+      scale: 1,
+      y: 0,
+      transition: {
+        type: 'spring',
+        stiffness: 300,
+        damping: 25
+      }
+    },
+    exit: {
+      opacity: 0,
+      scale: 0.95,
+      y: -10,
+      transition: { duration: 0.2 }
+    }
+  };
   // Monitor auth token + theme + scroll
   useEffect(() => {
     const checkToken = () => setIsLoggedIn(!!localStorage.getItem("token"));
@@ -121,21 +146,65 @@ function Navbar() {
       <AnimatePresence>
         {isSearchOpen && (
           <motion.div
-            key="search-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-            aria-modal
-            role="dialog"
+            className="fixed inset-0 z-[80] flex items-center justify-center p-4"
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            variants={searchVariants}
           >
+            {/* Enhanced backdrop */}
             <motion.div
-              initial={{ scale: 0.98, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.98, opacity: 0 }}
-              className="w-full max-w-xl"
+              className="absolute inset-0 bg-transperant backdrop-blur-md"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsSearchOpen(false)}
+            />
+            <motion.div
+              ref={searchOverlayRef}
+              className="relative w-11/12 md:w-3/4 lg:w-1/2 rounded-2xl shadow-2xl bg-[color:var(--color-background-secondary)]/95 border border-[color:var(--color-background-tertiary)]/50 backdrop-blur-2xl overflow-hidden"
+              variants={searchVariants}
             >
-              <SearchBar onClose={() => setIsSearchOpen(false)} />
+              {/* Search header with gradient */}
+              <div className="relative p-6 bg-gradient-to-r from-[color:var(--color-accent)]/10 to-purple-500/10 border-b border-[color:var(--color-background-tertiary)]/30">
+                <div className="flex items-center gap-4">
+                  <motion.div
+                    animate={{
+                      scale: [1, 1.1, 1],
+                      rotate: [0, 5, -5, 0]
+                    }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity,
+                      ease: 'easeInOut'
+                    }}
+                  >
+                    <Search size={24} className="text-[color:var(--color-accent)]" />
+                  </motion.div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-[color:var(--color-text-primary)] mb-1">
+                      Search Movies & TV Shows
+                    </h3>
+                    <p className="text-sm text-[color:var(--color-text-secondary)]/70">
+                      Find your next favorite content
+                    </p>
+                  </div>
+                  <motion.button
+                    onClick={() => setIsSearchOpen(false)}
+                    className="p-2 rounded-xl text-[color:var(--color-text-secondary)] hover:bg-[color:var(--color-background-tertiary)] hover:text-[color:var(--color-text-primary)] transition-colors"
+                    whileHover={{ rotate: 90, scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    aria-label="Close search"
+                  >
+                    <X size={20} />
+                  </motion.button>
+                </div>
+              </div>
+
+              {/* Search content */}
+              <div className="p-6">
+                <SearchBar onSearchSubmit={() => setIsSearchOpen(false)} />
+              </div>
             </motion.div>
           </motion.div>
         )}

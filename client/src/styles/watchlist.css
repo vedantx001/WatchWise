@@ -1,89 +1,212 @@
-/* client/src/Watchlist.css */
-
-.tab-button.active {
-  border-bottom: 2px solid var(--color-accent);
-  color: var(--color-accent);
-  font-weight: 600;
+/* Only mobile should use the new list UI */
+.wl-mobile-only {
+  display: none;
+}
+.wl-hide-on-mobile {
+  /* visible by default; hidden on mobile below */
 }
 
-.status-tab-button.active {
-  background-color: var(--color-accent);
-  color: var(--color-background-primary);
+@media (max-width: 640px) {
+  .wl-mobile-only {
+    display: block;
+  }
+  .wl-hide-on-mobile {
+    display: none !important;
+  }
 }
 
-.watchlist-item {
+.wl-tab-btn {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--color-text-secondary);
+  font-weight: 700;
+  padding: 10px 6px 12px;
+  border-bottom: 3px solid transparent;
+  transition: color .2s ease, border-color .2s ease;
+}
+.wl-tab-btn.active {
+  color: var(--color-text-primary); 
+  border-color: var(--color-accent);
+}
+.wl-tabs-underline {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(255,255,255,0.06);
+}
+
+/* Mobile list container */
+.wl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* List rows (movie/season) */
+.wl-row-card {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  background: var(--color-background-secondary);
+  border: 1px solid var(--color-background-secondary);
+  color: var(--color-text-primary);
+  border-radius: 16px;
+  padding: 12px;
+  box-shadow: 0 6px 22px rgba(0,0,0,0.18);
+}
+.wl-row-card.wl-row-nested {
+  margin-top: 10px;
+}
+
+/* Poster */
+.wl-row-poster {
+  width: 64px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: 10px;
+  background: var(--color-background-secondary);
+}
+
+/* Content */
+.wl-row-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.wl-row-title {
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--color-text-primary); /* was #fff */
+  line-height: 1.1;
+}
+.wl-row-title.underlined {
+  position: relative;
+  padding-bottom: 3px;
+}
+.wl-row-title.underlined::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  height: 3px;
+  width: 44px;
+  background: var(--color-accent);
+  border-radius: 2px;
+}
+
+.wl-row-meta {
   display: flex;
   align-items: center;
-  background-color: var(--color-background-secondary);
-  border-radius: 0.5rem;
-  padding: 0.75rem;
-  margin-bottom: 0.75rem;
-  box-shadow: 0 4px 6px -1px rgba(44,44,44,0.08), 0 2px 4px -1px rgba(44,44,44,0.04);
-  transition: transform 0.2s ease-in-out;
+  gap: 8px;
 }
 
-.watchlist-item:hover {
-  transform: translateY(-2px);
+.wl-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.2px;
+  color: var(--color-text-primary); /* was #fff */
+  background: rgba(255,255,255,0.06);
+  border: 1px solid transparent;
+}
+.wl-badge.info {
+  background: var(--color-accent);
+  color: #fff; /* readable on accent in both themes */
+}
+.wl-badge.planned {
+  color: var(--color-text-primary);
+  background: transparent;
+  border-color: var(--color-accent);
+}
+.wl-badge.watching {
+  background: transparent;
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+.wl-badge.completed {
+  background: var(--color-accent);
+  color: #fff;
 }
 
-.watchlist-item-poster {
-  width: 80px;
-  height: 120px;
-  object-fit: cover;
-  border-radius: 0.25rem;
-  flex-shrink: 0;
-  margin-right: 1rem;
-}
-
-.chevron-right {
-  margin-left: auto;
+.wl-row-sub {
+  font-size: 12px;
+  opacity: 0.8;
   color: var(--color-text-secondary);
 }
 
-@media (max-width: 639px) {
-  .watchlist-item {
-    padding: 0.5rem;
-    margin-bottom: 0.5rem;
-  }
-  .watchlist-item-poster {
-    width: 60px;
-    height: 90px;
-    margin-right: 0.75rem;
-  }
+/* Chevron */
+.wl-chevron {
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  font-size: 28px;
+  padding: 0 2px;
 }
 
-.desktop-watchlist-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 1.5rem;
+/* TV show groups */
+.wl-show-group {
+  background: transparent;
+  border-radius: 14px;
+}
+.wl-show-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--color-text-primary); /* was #fff */
+  padding: 6px 2px;
+  font-weight: 800;
+  font-size: 1.2rem;
+}
+.wl-show-title {
+  color: var(--color-text-primary); /* was #fff */
+}
+.wl-caret {
+  transform: rotate(0deg);
+  transition: transform .2s ease;
+  color: var(--color-accent);
+  font-size: 18px;
+}
+.wl-caret.open {
+  transform: rotate(180deg);
+}
+.wl-show-body {
+  padding-left: 0;
 }
 
-.action-button {
-  background-color: var(--color-background-secondary);
-  color: var(--color-text-primary);
-  padding: 0.3rem 0.6rem;
-  border-radius: 0.375rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  transition: background-color 0.2s;
+/* Empty state on mobile */
+.wl-empty {
+  text-align: center;
+  padding: 48px 10px;
+  color: var(--color-text-secondary);
 }
 
-.action-button:hover {
-  background-color: var(--color-background-primary);
+/* Skeletons */
+.wl-skeleton .skeleton {
+  background: rgba(255,255,255,0.06);
 }
-
-.action-button.delete,
-.action-button.completed,
-.action-button.rate,
-.action-button.favorite,
-.action-button.unfavorite {
-  background-color: var(--color-accent);
+.wl-skel-line {
+  width: 70%;
+  height: 14px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.06);
 }
-
-.action-button.delete:hover,
-.action-button.completed:hover,
-.action-button.rate:hover,
-.action-button.favorite:hover,
-.action-button.unfavorite:hover {
-  background-color: var(--color-background-primary);
+.wl-skel-line.short {
+  width: 40%;
+}
+.wl-skel-line.tiny {
+  width: 30%;
+  height: 10px;
 }

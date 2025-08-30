@@ -6,19 +6,59 @@ const mongoose = require('mongoose');
 const { fetchMovieDetails, fetchTvShowDetails, fetchSeasonDetails, TMDB_IMAGE_BASE_URL } = require("../utils/tmdbApi");
 
 
+/** Helper: recompute show-level totals from seasons present on the doc */
+function recomputeShowAggregatesFromDoc(showDoc) {
+  const seasons = Array.isArray(showDoc.seasons) ? showDoc.seasons : [];
+  const totalEpisodes = seasons.reduce((acc, s) => acc + (s.episodeCount || 0), 0);
+  const totalDuration = seasons.reduce((acc, s) => acc + (s.duration || 0), 0);
+  showDoc.totalEpisodes = totalEpisodes;
+  showDoc.duration = totalDuration;       // keep using `duration` as canonical total minutes
+  showDoc.totalDuration = totalDuration;  // keep this in sync if your schema uses it
+}
+
+/** Helper: build a single season block from TMDb season details */
+function buildSeasonBlock(seasonData, tvData, status) {
+  const fallbackEpRuntime = Array.isArray(tvData.episode_run_time) && tvData.episode_run_time.length > 0
+    ? tvData.episode_run_time[0]
+    : 0;
+
+  const episodes = (seasonData.episodes || []).map((ep) => {
+    const duration = ep.runtime || fallbackEpRuntime || 0;
+    return {
+      episodeNumber: ep.episode_number,
+      name: ep.name,
+      duration,
+      overview: ep.overview,
+      airDate: ep.air_date ? new Date(ep.air_date) : null,
+      rating: ep.vote_average || 0,
+    };
+  });
+
+  const seasonDuration = episodes.reduce((acc, e) => acc + (e.duration || 0), 0);
+
+  return {
+    seasonNumber: seasonData.season_number,
+    title: seasonData.name || `Season ${seasonData.season_number}`,
+    overview: seasonData.overview,
+    episodeCount: episodes.length,
+    duration: seasonDuration,
+    posterPath: seasonData.poster_path
+      ? `${TMDB_IMAGE_BASE_URL}${seasonData.poster_path}`
+      : null,
+    status: status || "planned",
+    voteAverage: seasonData.vote_average || 0, // store TMDb season rating
+    episodes,
+  };
+}
+
 router.post(
   "/",
   auth,
   [
-    // --- Validation ---
     check("tmdbId", "TMDB ID is required").notEmpty().isString(),
     check("contentType", "Content type is required").isIn(["movie", "tv"]),
-    check("status", "Invalid status")
-      .optional()
-      .isIn(["planned", "watching", "completed"]),
-    check("rating", "Rating must be between 0 and 10")
-      .optional()
-      .isFloat({ min: 0, max: 10 }),
+    check("status", "Invalid status").optional().isIn(["planned", "watching", "completed"]),
+    check("rating", "Rating must be between 0 and 10").optional().isFloat({ min: 0, max: 10 }),
     check("seasonNumber")
       .if((value, { req }) => req.body.contentType === "tv")
       .isInt({ min: 0 })
@@ -31,30 +71,20 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const {
-      status,
-      rating,
-      favorite,
-      tmdbId,
-      contentType,
-      seasonNumber,
-    } = req.body;
+    const { status, favorite, tmdbId, contentType, seasonNumber } = req.body;
 
     try {
       if (contentType === "movie") {
         // ----- Handle Movie -----
         const tmdbData = await fetchMovieDetails(tmdbId);
 
-        // Prevent duplicate movies
         const existing = await Movie.findOne({
           user: req.user.id,
           tmdbId,
           contentType: "movie",
         });
         if (existing) {
-          return res
-            .status(400)
-            .json({ msg: "This movie is already in your watchlist." });
+          return res.status(400).json({ msg: "This movie is already in your watchlist." });
         }
 
         const newMovie = new Movie({
@@ -62,7 +92,7 @@ router.post(
           tmdbId,
           contentType,
           status: status || "planned",
-          rating: tmdbData.vote_average || 0,
+          rating: tmdbData.vote_average || 0, // TMDb rating saved to parent `rating`
           favorite: favorite || false,
           completedDate: status === "completed" ? new Date() : null,
           title: tmdbData.title,
@@ -72,114 +102,33 @@ router.post(
             : null,
           releaseDate: tmdbData.release_date,
           language: tmdbData.original_language,
-          duration: tmdbData.runtime || 0,
+          duration: tmdbData.runtime || 0, // minutes
         });
 
         const saved = await newMovie.save();
         return res.status(201).json(saved);
+      }
 
-      } else if (contentType === "tv") {
-        // ----- Handle TV SEASON -----
+      // ----- Handle TV -----
+      if (contentType === "tv") {
         if (seasonNumber === undefined || seasonNumber === null) {
-          return res
-            .status(400)
-            .json({ msg: "Season number is required for TV shows" });
+          return res.status(400).json({ msg: "Season number is required for TV shows" });
         }
 
         const tvData = await fetchTvShowDetails(tmdbId);
-        const seasonData = await fetchSeasonDetails(tmdbId, seasonNumber);
 
-        // Calculate totals
-        const totalEpisodes =
-          tvData.seasons?.reduce((acc, s) => acc + (s.episode_count || 0), 0) ||
-          0;
-
-        let allEpisodeDurations = [];
-        if (tvData.seasons && Array.isArray(tvData.seasons)) {
-          for (const s of tvData.seasons) {
-            if (
-              s.episode_count &&
-              tvData.episode_run_time &&
-              tvData.episode_run_time.length > 0
-            ) {
-              allEpisodeDurations.push(
-                ...Array(s.episode_count).fill(tvData.episode_run_time[0])
-              );
-            }
-          }
-        }
-        if (seasonData.episodes && Array.isArray(seasonData.episodes)) {
-          for (const ep of seasonData.episodes) {
-            if (ep.runtime) {
-              allEpisodeDurations.push(ep.runtime);
-            }
-          }
-        }
-
-        const totalDuration = allEpisodeDurations.reduce(
-          (acc, d) => acc + (d || 0),
-          0
-        );  
-
-        // Season duration
-        const seasonDuration =
-          seasonData.episodes?.reduce(
-            (acc, ep) =>
-              acc + (ep.runtime || tvData.episode_run_time?.[0] || 0),
-            0
-          ) || 0;
-
-        // Find existing show
+        // Prevent duplicate shows
         let existingShow = await Movie.findOne({
           user: req.user.id,
           tmdbId,
           contentType: "tv",
         });
 
-        if (existingShow) {
-          // Check if season already exists
-          const alreadyAdded = existingShow.seasons.find(
-            (s) => Number(s.seasonNumber) === Number(seasonNumber)
-          );
-          if (alreadyAdded) {
-            return res
-              .status(400)
-              .json({ msg: "This season is already in your watchlist." });
-          }
+        // CASE A: Placeholder add (seasonNumber === 0) => create the show without Specials
+        if (!existingShow && Number(seasonNumber) === 0) {
+          const totalEpisodesFromTMDB =
+            (tvData.seasons || []).reduce((acc, s) => acc + (s.episode_count || 0), 0) || 0;
 
-          // Add new season
-          existingShow.seasons.push({
-            seasonNumber,
-            title: seasonData.name || `Season ${seasonNumber}`,
-            overview: seasonData.overview,
-            episodeCount: seasonData.episodes.length,
-            duration: seasonDuration,
-            posterPath: seasonData.poster_path
-              ? `${TMDB_IMAGE_BASE_URL}${seasonData.poster_path}`
-              : existingShow.posterPath,
-            status: status || "planned",
-            episodes: seasonData.episodes.map((ep) => ({
-              episodeNumber: ep.episode_number,
-              name: ep.name,
-              duration: ep.runtime || tvData.episode_run_time?.[0] || 0,
-              overview: ep.overview,
-              airDate: ep.air_date ? new Date(ep.air_date) : null,
-              rating: ep.vote_average || 0,
-            })),
-          });
-
-          // Update show-level fields
-          existingShow.duration = totalDuration;
-          existingShow.tmdbRating = tvData.vote_average || 0;
-          existingShow.inProduction = tvData.in_production;
-          existingShow.totalEpisodes = totalEpisodes;
-          existingShow.totalSeasons = tvData.number_of_seasons;
-
-          await existingShow.save();
-          return res.status(201).json(existingShow);
-
-        } else {
-          // Create new show
           const newShow = new Movie({
             user: req.user.id,
             tmdbId,
@@ -193,31 +142,102 @@ router.post(
             language: tvData.original_language,
             totalSeasons: tvData.number_of_seasons,
             inProduction: tvData.in_production,
-            duration: totalDuration,
-            tmdbRating: tvData.vote_average || 0,
-            totalEpisodes,
+            // Official TMDb show rating saved on parent:
+            rating: tvData.vote_average || 0,
+            // Durations start at 0 when no concrete season is tracked yet:
+            duration: 0,
+            totalDuration: 0,
+            totalEpisodes: totalEpisodesFromTMDB, // metadata from TMDb
+            episodeDuration:
+              (Array.isArray(tvData.episode_run_time) && tvData.episode_run_time[0]) || 0,
+            seasons: [],
+            status: status || "planned",
+            favorite: !!favorite,
+          });
+
+          const savedShow = await newShow.save();
+          return res.status(201).json(savedShow);
+        }
+
+        // CASE B: Add a concrete season (> 0) or when show already exists
+        const seasonNum = Number(seasonNumber);
+        if (seasonNum === 0) {
+          // If show already exists and they try to add 0 again, no-op
+          return res.status(200).json(existingShow);
+        }
+
+        // Fetch that specific season
+        const seasonData = await fetchSeasonDetails(tmdbId, seasonNum);
+        const seasonBlock = buildSeasonBlock(seasonData, tvData, status);
+
+        if (existingShow) {
+          // Ensure the season doesn't already exist
+          const already = (existingShow.seasons || []).find(
+            (s) => Number(s.seasonNumber) === seasonNum
+          );
+          if (already) {
+            return res.status(400).json({ msg: "This season is already in your watchlist." });
+          }
+
+          // Push new season and recompute totals from what's on the doc
+          existingShow.seasons.push({
+            ...seasonBlock,
+            // Keep poster fallback to parent if needed
+            posterPath:
+              seasonBlock.posterPath || existingShow.posterPath || null,
+          });
+
+          // Update show-level metadata from TMDb
+          existingShow.title = tvData.name || existingShow.title;
+          existingShow.genre = tvData.genres ? tvData.genres.map((g) => g.name) : existingShow.genre;
+          existingShow.inProduction = tvData.in_production;
+          existingShow.totalSeasons = tvData.number_of_seasons;
+          existingShow.language = tvData.original_language || existingShow.language;
+          // Critical: use official TMDb show rating
+          existingShow.rating = tvData.vote_average || 0;
+
+          // Recompute duration & totals **from seasons present on the doc**
+          recomputeShowAggregatesFromDoc(existingShow);
+
+          await existingShow.save();
+          return res.status(201).json(existingShow);
+        } else {
+          // Create new show with the single season
+          const totalEpisodesFromTMDB =
+            (tvData.seasons || []).reduce((acc, s) => acc + (s.episode_count || 0), 0) || 0;
+
+          const newShow = new Movie({
+            user: req.user.id,
+            tmdbId,
+            contentType: "tv",
+            title: tvData.name,
+            genre: tvData.genres ? tvData.genres.map((g) => g.name) : [],
+            posterPath: tvData.poster_path
+              ? `${TMDB_IMAGE_BASE_URL}${tvData.poster_path}`
+              : null,
+            releaseDate: tvData.first_air_date,
+            language: tvData.original_language,
+            totalSeasons: tvData.number_of_seasons,
+            inProduction: tvData.in_production,
+            // Save TMDb official show rating on parent:
+            rating: tvData.vote_average || 0,
             seasons: [
               {
-                seasonNumber,
-                title: seasonData.name || `Season ${seasonNumber}`,
-                overview: seasonData.overview,
-                episodeCount: seasonData.episodes.length,
-                duration: seasonDuration,
-                posterPath: seasonData.poster_path
-                  ? `${TMDB_IMAGE_BASE_URL}${seasonData.poster_path}`
-                  : null,
-                status: status || "planned",
-                episodes: seasonData.episodes.map((ep) => ({
-                  episodeNumber: ep.episode_number,
-                  name: ep.name,
-                  duration: ep.runtime || tvData.episode_run_time?.[0] || 0,
-                  overview: ep.overview,
-                  airDate: ep.air_date ? new Date(ep.air_date) : null,
-                  rating: ep.vote_average || 0,
-                })),
+                ...seasonBlock,
+                posterPath:
+                  seasonBlock.posterPath ||
+                  (tvData.poster_path ? `${TMDB_IMAGE_BASE_URL}${tvData.poster_path}` : null),
               },
             ],
+            status: status || "planned",
+            favorite: !!favorite,
+            totalEpisodes: totalEpisodesFromTMDB, // metadata
+            episodeDuration:
+              (Array.isArray(tvData.episode_run_time) && tvData.episode_run_time[0]) || 0,
           });
+
+          // Derive totals from the season(s) we store on the doc
+          recomputeShowAggregatesFromDoc(newShow);
 
           const savedShow = await newShow.save();
           return res.status(201).json(savedShow);
@@ -278,7 +298,7 @@ router.put("/:id/favorite", auth, async (req, res) => {
   }
 });
 
-// UPDATE SEASON STATUS
+// UPDATE OR CREATE SEASON STATUS
 router.put("/:id/season/:seasonNumber", auth, async (req, res) => {
   const { status } = req.body;
 
@@ -290,17 +310,29 @@ router.put("/:id/season/:seasonNumber", auth, async (req, res) => {
     if (show.user.toString() !== req.user.id)
       return res.status(401).json({ msg: "Not authorized" });
 
-    const season = show.seasons.find(
+    // Find season by number
+    let season = show.seasons.find(
       (s) => s.seasonNumber === parseInt(req.params.seasonNumber)
     );
-    if (!season) return res.status(404).json({ msg: "Season not found" });
 
-    // Update season status
-    season.status = status;
-    season.completedDate = status === "completed" ? new Date() : null;
+    // If season not found, create it
+    if (!season) {
+      season = {
+        seasonNumber: parseInt(req.params.seasonNumber),
+        status: status || "planned",
+        episodes: [],
+      };
+      show.seasons.push(season);
+    } else {
+      // Otherwise update status
+      season.status = status;
+      season.completedDate = status === "completed" ? new Date() : null;
+    }
 
-    // 🔄 Update parent show status dynamically
-    const allCompleted = show.seasons.every((s) => s.status === "completed");
+    // Update parent show status dynamically
+    const allCompleted =
+      show.seasons.length > 0 &&
+      show.seasons.every((s) => s.status === "completed");
     const anyWatching = show.seasons.some((s) => s.status === "watching");
 
     if (allCompleted) {
@@ -321,6 +353,7 @@ router.put("/:id/season/:seasonNumber", auth, async (req, res) => {
     res.status(500).send("Server error");
   }
 });
+
 
 
 
