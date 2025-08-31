@@ -20,6 +20,12 @@ html.dark {
 html {
   background-color: var(--color-background-primary);
   color: var(--color-text-primary);
+  height: 100%;
+  width: 100%;
+}
+body{
+  height: 100%;
+  width: 100%;
 }
 html:not(.light) {
   background-color: var(--color-background-primary);
