@@ -8,6 +8,7 @@ function Dashboard() {
   const [timeFilter, setTimeFilter] = useState("overall"); // 'overall', 'year', 'month'
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
+  const [showAllTop, setShowAllTop] = useState(false);
 
   useEffect(() => {
     const fetchDashboardStats = async () => {
@@ -19,12 +20,10 @@ function Dashboard() {
           month: "thisMonth",
         }[timeFilter] || "overall";
 
-        const res = await api.get("/stats", { // Using the new /stats endpoint
-          params: {
-            contentType: contentTypeFilter,
-            period: period,
-          },
+        const res = await api.get("/stats", {
+          params: { contentType: contentTypeFilter, period }
         });
+        console.log("Fetched stats:", res.data);
         setStats(res.data);
       } catch (error) {
         console.error("Failed to fetch dashboard data:", error);
@@ -81,26 +80,14 @@ function Dashboard() {
   }
 
   const { stats: mainStats, dailyActivity, top5 = [], top10 = [] } = stats;
-  // Helper to format watch time (Xd Yh Zm)
-  function formatWatchTime(totalMinutes) {
-    if (!totalMinutes || totalMinutes <= 0) return "0m";
-    const minutesInDay = 1440;
-    const minutesInHour = 60;
-    const days = Math.floor(totalMinutes / minutesInDay);
-    const remainingMinutesAfterDays = totalMinutes % minutesInDay;
-    const hours = Math.floor(remainingMinutesAfterDays / minutesInHour);
-    const minutes = Math.round(remainingMinutesAfterDays % minutesInHour);
-    const parts = [];
-    if (days > 0) parts.push(`${days}d`);
-    if (hours > 0) parts.push(`${hours}h`);
-    if (minutes > 0) parts.push(`${minutes}m`);
-    if (parts.length === 0 && totalMinutes > 0) return "1m";
-    return parts.join(" ") || "0m";
-  }
-
-  // Top list toggle
-  const [showAllTop, setShowAllTop] = useState(false);
   const topList = showAllTop && top10.length > 0 ? top10 : top5;
+  // Helper to format watch time (Xd Yh Zm)
+  const formatWatchTime = (minutes) => {
+    const days = Math.floor(minutes / 1440);
+    const hours = Math.floor((minutes % 1440) / 60);
+    const mins = minutes % 60;
+    return `${days > 0 ? `${days}d ` : ""}${hours > 0 ? `${hours}h ` : ""}${mins > 0 ? `${mins}m` : ""}`.trim();
+  };
 
   return (
     <div className="min-h-screen font-sans p-4 md:p-8 bg-[var(--color-background-primary)] text-[var(--color-text-primary)]">
@@ -135,15 +122,15 @@ function Dashboard() {
               </>
             ) : (
               <>
+                <StatCard title="TV series watched" value={mainStats.tvSeriesWatched ?? 'N/A'} />
                 <StatCard title="Seasons watched" value={mainStats.watchCount ?? 'N/A'} />
+                <StatCard title="Episodes watched" value={mainStats.episodesWatched ?? 'N/A'} />
                 <StatCard title="Avg. rate" value={formatRating(mainStats.avgRate)} />
                 <StatCard title="Best rated TV series" value={mainStats.bestRatedTVSeries ?? 'N/A'} />
                 <StatCard title="Best rate" value={formatRating(mainStats.bestRate)} />
                 <StatCard title="Worst rated TV series" value={mainStats.worstRatedTVSeries ?? 'N/A'} />
                 <StatCard title="Worst rate" value={formatRating(mainStats.worstRate)} />
                 <StatCard title="Favorite genre" value={mainStats.favoriteGenre ?? 'N/A'} />
-                <StatCard title="Episodes watched" value={mainStats.episodesWatched ?? 'N/A'} />
-                <StatCard title="TV series watched" value={mainStats.tvSeriesWatched ?? 'N/A'} />
                 <StatCard title="Watch time" value={formatWatchTime(mainStats.watchTime)} />
               </>
             )}

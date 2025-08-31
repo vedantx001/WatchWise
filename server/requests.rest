@@ -46,7 +46,7 @@ x-auth-token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoiNjg4Y2YyY
 ###
 
 GET http://localhost:5000/api/movies
-x-auth-token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoiNjg4Y2YyYjJjM2IwNGMxMDk5OTM1NDE0In0sImlhdCI6MTc1NjE5NjYzNCwiZXhwIjoxNzU2MjAwMjM0fQ.UhhrY0KYXmetk7lZFHbHNOnXR831_82_NENWu5BbMmk
+x-auth-token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoiNjg4Y2YyYjJjM2IwNGMxMDk5OTM1NDE0In0sImlhdCI6MTc1NjYzODQwMywiZXhwIjoxNzU2NjQyMDAzfQ.NvsCWFTzI3WTHZpfhav21XzhRSrMFMdoIsnpUk_s5Os
 
 ### 
 
