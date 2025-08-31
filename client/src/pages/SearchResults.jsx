@@ -1,5 +1,3 @@
-// src/components/SearchResults.jsx
-
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {

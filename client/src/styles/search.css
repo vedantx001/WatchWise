@@ -1,5 +1,3 @@
-/* src/styles/search.css */
-
 /* Search Bar */
 .search-bar {
   display: flex;
@@ -115,7 +113,8 @@
 /* Grid */
 .results-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(170px, auto));
+  justify-content: center;
   gap: 1.1rem;
   margin-top: 6px;
 }
