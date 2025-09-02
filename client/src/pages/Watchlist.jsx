@@ -419,8 +419,6 @@ function Watchlist() {
   };
 
   const MovieDesktopCard = ({ m }) => {
-    const [open, setOpen] = useState(false);
-
     return (
       <motion.article
         layout
@@ -436,21 +434,20 @@ function Watchlist() {
           color: "var(--color-text-primary)",
         }}
       >
-        {/* Header */}
-        <div className="flex gap-3 p-4">
-          <img
-            src={m.posterUrl || fallbackPoster}
-            alt={m.title}
-            className="h-20 w-14 object-cover rounded-lg border"
-            style={{ borderColor: "var(--color-background-primary)" }}
-            loading="lazy"
-            onError={(e) => {
-              e.currentTarget.onerror = null;
-              e.currentTarget.src = fallbackPoster;
-            }}
-          />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-col p-4 gap-3">
+          <div className="flex gap-3">
+            <img
+              src={m.posterUrl || fallbackPoster}
+              alt={m.title}
+              className="h-20 w-14 object-cover rounded-lg border"
+              style={{ borderColor: "var(--color-background-primary)" }}
+              loading="lazy"
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = fallbackPoster;
+              }}
+            />
+            <div className="flex-1 min-w-0">
               <h4 className="font-bold text-base sm:text-lg line-clamp-2">
                 <Link
                   to={`/details/movie/${m.tmdbId}`}
@@ -461,79 +458,53 @@ function Watchlist() {
                   {m.title}
                 </Link>
               </h4>
-              <button
-                onClick={() => setOpen((o) => !o)}
-                className="ml-2"
-                aria-expanded={open}
-                title={open ? "Collapse" : "Expand"}
-                style={{ color: "var(--color-text-secondary)", cursor: "pointer" }}
-              >
-                <span className={`inline-block transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
-              </button>
+              <div className="mt-1 flex items-center gap-2 flex-wrap">
+                <StatusPill status={m.status} />
+                <span className="text-xs opacity-80" style={{ color: "var(--color-text-secondary)" }}>
+                  Added {new Date(m.createdAt).toLocaleDateString()}
+                </span>
+              </div>
             </div>
-            <div className="mt-1 flex items-center gap-2 flex-wrap">
-              <StatusPill status={m.status} />
-              <span className="text-xs opacity-80" style={{ color: "var(--color-text-secondary)" }}>
-                Added {new Date(m.createdAt).toLocaleDateString()}
-              </span>
+            <div className="flex items-start gap-2 pl-1">
+              <ActionIcon
+                title={m.favorite ? "Unfavorite" : "Favorite"}
+                onClick={() => toggleFavorite(m._id)}
+              >
+                {m.favorite ? "♥" : "♡"}
+              </ActionIcon>
+              <ActionIcon title="Delete" onClick={() => deleteItem(m._id)} danger>
+                🗑
+              </ActionIcon>
             </div>
           </div>
-          <div className="flex items-start gap-2 pl-1">
-            <ActionIcon
-              title={m.favorite ? "Unfavorite" : "Favorite"}
-              onClick={() => toggleFavorite(m._id)}
-            >
-              {m.favorite ? "♥" : "♡"}
-            </ActionIcon>
-            <ActionIcon title="Delete" onClick={() => deleteItem(m._id)} danger>
-              🗑
-            </ActionIcon>
+          <div className="flex items-center gap-2 flex-wrap px-1">
+            {m.status === "planned" && (
+              <button
+                onClick={() => startWatching(m._id)}
+                className="px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold shadow-md"
+                style={{ background: "var(--color-accent)", color: "#fff", border: "1px solid var(--color-accent)", cursor: "pointer" }}
+                title="Start watching"
+              >
+                Start Watching
+              </button>
+            )}
+            {m.status === "watching" && (
+              <button
+                onClick={() => completeWatching(m._id)}
+                className="px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold shadow-md"
+                style={{ background: "var(--color-accent)", color: "#fff", border: "1px solid var(--color-accent)", cursor: "pointer" }}
+                title="Mark completed"
+              >
+                Mark Completed
+              </button>
+            )}
+            {m.status === "completed" && (
+              <span className="text-sm font-semibold" style={{ color: "var(--color-accent)" }}>
+                ✔ Completed
+              </span>
+            )}
           </div>
         </div>
-
-        {/* Body */}
-        <AnimatePresence initial={false}>
-          {open && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="px-4 pb-4"
-            >
-              {/* Use the same compact mobile row for a consistent look */}
-              <div className="space-y-2">
-                <MobileMovieRow m={m} />
-                <div className="flex items-center gap-2">
-                  {m.status === "planned" && (
-                    <button
-                      onClick={() => startWatching(m._id)}
-                      className="px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold shadow-md"
-                      style={{ background: "var(--color-accent)", color: "#fff", border: "1px solid var(--color-accent)", cursor: "pointer" }}
-                      title="Start watching"
-                    >
-                      Start Watching
-                    </button>
-                  )}
-                  {m.status === "watching" && (
-                    <button
-                      onClick={() => completeWatching(m._id)}
-                      className="px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold shadow-md"
-                      style={{ background: "var(--color-accent)", color: "#fff", border: "1px solid var(--color-accent)", cursor: "pointer" }}
-                      title="Mark completed"
-                    >
-                      Mark Completed
-                    </button>
-                  )}
-                  {m.status === "completed" && (
-                    <span className="text-sm font-semibold" style={{ color: "var(--color-accent)" }}>
-                      ✔ Completed
-                    </span>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </motion.article>
     );
   };

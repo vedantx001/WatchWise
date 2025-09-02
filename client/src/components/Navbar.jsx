@@ -203,7 +203,7 @@ function Navbar() {
 
               {/* Search content */}
               <div className="p-6">
-                <SearchBar onSearchSubmit={() => setIsSearchOpen(false)} />
+                <SearchBar onClose={() => setIsSearchOpen(false)} />
               </div>
             </motion.div>
           </motion.div>
