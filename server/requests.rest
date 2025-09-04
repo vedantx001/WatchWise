@@ -67,3 +67,13 @@ Content-Type: application/json
 
 GET http://localhost:5000/api/movies/stats?contentType=tv
 x-auth-token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoiNjg4Y2YyYjJjM2IwNGMxMDk5OTM1NDE0In0sImlhdCI6MTc1NjE0MDMwMCwiZXhwIjoxNzU2MTQzOTAwfQ.e8WVKJz0k6RMxxWEZM9fr98wK6poK5u258UT56vbd6Q
+
+###
+
+POST http://localhost:5000/api/chat
+Content-Type: application/json
+x-auth-token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoiNjg4Y2YyYjJjM2IwNGMxMDk5OTM1NDE0In0sImlhdCI6MTc1Njk3NDQ1NywiZXhwIjoxNzU2OTc4MDU3fQ.my816E7FjdVGZN0Cyt7xbbhA7PyYgeLc4rCApOXC8OA
+
+{
+  "message": "Which movie should I watch on a rainy day?"
+}
