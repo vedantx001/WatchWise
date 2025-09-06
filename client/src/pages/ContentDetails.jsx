@@ -86,6 +86,13 @@ export default function ContentDetails() {
 
   const [adding, setAdding] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [toast, setToast] = useState(null); // { type: 'success' | 'error', message: string }
+
+  const showToast = (message, type = 'success', duration = 2800) => {
+    setToast({ message, type });
+    window.clearTimeout(showToast._t);
+    showToast._t = window.setTimeout(() => setToast(null), duration);
+  };
 
   const isMovie = type === "movie";
   const isTv = type === "tv";
@@ -218,6 +225,7 @@ export default function ContentDetails() {
         headers: { "x-auth-token": localStorage.getItem("token") || "" },
       });
       setWatchDoc(res.data || null);
+  showToast(isMovie ? "Movie added to watchlist" : "Added to watchlist", 'success');
     } catch (err) {
       console.error("Failed to add to watchlist:", err);
       const msg =
@@ -225,7 +233,7 @@ export default function ContentDetails() {
         err?.response?.data?.errors?.[0]?.msg ||
         err.message ||
         "Unknown";
-      alert(`Failed to add: ${msg}`);
+  showToast(`Failed to add: ${msg}`, 'error');
     } finally {
       setAdding(false);
     }
@@ -253,7 +261,7 @@ export default function ContentDetails() {
         err?.response?.data?.errors?.[0]?.msg ||
         err.message ||
         "Unknown";
-      alert(`Failed to update: ${msg}`);
+  showToast(`Failed to update: ${msg}`, 'error');
     } finally {
       setUpdatingStatus(false);
     }
@@ -363,6 +371,14 @@ export default function ContentDetails() {
                 <div className="mt-auto pt-8 flex flex-wrap gap-4">
                   {isMovie ? (
                     !watchDoc ? (
+                      <>
+                        <button
+                          onClick={() => navigate(`/trailer/movie/${id}`)}
+                          className="btn-secondary"
+                          title="Play trailer"
+                        >
+                          ▶ Play Trailer
+                        </button>
                       <button
                         onClick={() => addToWatchlist("planned")}
                         className="btn-primary"
@@ -370,8 +386,16 @@ export default function ContentDetails() {
                       >
                         {adding ? "Adding..." : "➕ Add to Watchlist"}
                       </button>
+                      </>
                     ) : (
                       <>
+                        <button
+                          onClick={() => navigate(`/trailer/movie/${id}`)}
+                          className="btn-secondary"
+                          title="Play trailer"
+                        >
+                          ▶ Play Trailer
+                        </button>
                         {currentStatus !== "watching" && (
                           <button
                             onClick={() => setStatus("watching")}
@@ -524,6 +548,14 @@ export default function ContentDetails() {
         {/* Quick status chip + inline actions: only for movies */}
         {isMovie && (
           <div className="mt-4 flex items-center gap-3">
+            <button
+              onClick={() => navigate(`/trailer/movie/${id}`)}
+              className="w-10 h-10 rounded-full flex items-center justify-center cursor-pointer"
+              style={{ background: "var(--color-background-secondary)" }}
+              title="Play trailer"
+            >
+              ▶
+            </button>
             {!watchDoc ? (
               <button
                 onClick={() => addToWatchlist("planned")}
@@ -692,6 +724,15 @@ export default function ContentDetails() {
         </div>
       </div>
   {StickyCTA}
+      {/* Toast Notification */}
+      {toast && (
+        <div className="toast-container">
+          <div className={`toast ${toast.type}`} role="status" aria-live="polite">
+            <span className="toast-dot" aria-hidden="true" />
+            <span className="toast-message">{toast.message}</span>
+          </div>
+        </div>
+      )}
     </>
   );
 }

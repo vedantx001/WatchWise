@@ -106,7 +106,7 @@ function Footer() {
           {/* Back to top */}
           <button
             onClick={scrollToTop}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-md border text-xs font-medium hover:text-[var(--color-accent)] hover:border-[var(--color-accent)] transition"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-md border text-xs font-medium hover:text-[var(--color-accent)] hover:border-[var(--color-accent)] transition cursor-pointer"
             style={{
               borderColor:
                 "color-mix(in srgb, var(--color-text-secondary) 20%, transparent)",

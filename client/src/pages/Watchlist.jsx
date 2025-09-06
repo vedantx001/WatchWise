@@ -775,12 +775,15 @@ function Watchlist() {
       onClick={onClick}
       whileHover={{ y: -2, scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
-      className="fixed bottom-6 right-6 z-40 px-5 sm:px-6 py-3 rounded-full shadow-xl font-semibold"
+      // Positioned horizontally beside the chatbot FAB.
+      // Chatbot FAB: bottom 24px right 24px width 60px; add gap 16px => Add button right = 24 + 60 + 16 = 100px
+      className="fixed bottom-6 z-40 px-5 sm:px-6 py-3 rounded-full shadow-xl font-semibold"
       style={{
         background: "var(--color-accent)",
         color: "#fff",
         border: "1px solid var(--color-accent)",
         cursor: "pointer",
+        right: "100px",
       }}
       aria-label={label}
       title={label}

@@ -26,3 +26,19 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #6b7280; /* gray-500 */
 }
+
+/* Responsive stats grid: auto-fit columns with a minimum width */
+.responsive-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 1rem; /* 16px */
+}
+
+@media (min-width: 640px) { /* sm */
+  .responsive-stats-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+}
+
+/* Desktop: force exactly 2 columns (no more, no less) */
+@media (min-width: 1024px) { /* lg */
+  .responsive-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}
