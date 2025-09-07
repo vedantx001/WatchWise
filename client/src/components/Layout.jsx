@@ -47,7 +47,7 @@ function Layout() {
           >
             <ChatIcon />
           </button>
-          <div className="fixed bottom-20 right-6 z-50">
+          <div className="fixed bottom-20 right-6 z-[120]">
             <Chatbot visible={showChatbot} onClose={() => setShowChatbot(false)} />
           </div>
         </>

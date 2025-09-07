@@ -10,6 +10,7 @@ import Trending from "./pages/TrendsTab";
 import SearchResults from "./pages/SearchResults";
 import ContentDetails from "./pages/ContentDetails";
 import SeasonDetails from "./pages/SeasonDetails";
+import TrailerPlayer from "./components/TrailerPlayer";
 
 
 function App() {
@@ -29,6 +30,8 @@ function App() {
           <Route path="/trending" element={<Trending />} />
           <Route path="/details/:type/:id" element={<ContentDetails />} />
           <Route path="/details/:type/:id/season/:seasonNumber" element={<SeasonDetails />} />
+          <Route path="/trailer/movie/:id" element={<TrailerPlayer />} />
+          <Route path="/trailer/tv/:id/season/:seasonNumber" element={<TrailerPlayer />} />
         </Route>
       </Routes>
     </Router>

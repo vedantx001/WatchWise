@@ -100,7 +100,7 @@ function Dashboard() {
         />
 
         {/* Time Filter Selector */}
-        <div className="flex justify-center space-x-2 md:space-x-4 mb-8">
+  <div className="flex flex-wrap justify-center gap-2 md:gap-4 mb-8 px-1">
           <StatsFilterButton title="Overall stats" isActive={timeFilter === 'overall'} onClick={() => setTimeFilter('overall')} theme={activeTheme} />
           <StatsFilterButton title="This year" isActive={timeFilter === 'year'} onClick={() => setTimeFilter('year')} theme={activeTheme} />
           <StatsFilterButton title="This month" isActive={timeFilter === 'month'} onClick={() => setTimeFilter('month')} theme={activeTheme} />
@@ -108,7 +108,8 @@ function Dashboard() {
 
         {/* --- Stats Grid --- */}
         <div className="mb-8">
-          <div className="grid grid-cols-2 gap-4">
+          {/* Responsive stats grid auto-fills cards with a sensible minimum width */}
+          <div className="responsive-stats-grid">
             {contentTypeFilter === 'movie' ? (
               <>
                 <StatCard title="Watch count" value={mainStats.watchCount ?? 'N/A'} />
@@ -167,10 +168,25 @@ function Dashboard() {
         <div className="mt-8">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xl font-bold text-[var(--color-text-primary)]">Your top {showAllTop ? 10 : 5}</h3>
-            {top10.length > 5 && (
+            {(top10.length > 5 || (top10.length === 0 && top5.length > 5)) && (
               <button
-                onClick={() => setShowAllTop(!showAllTop)}
-                className="px-3 py-1 rounded-lg font-semibold text-sm transition-colors duration-200 bg-[color:color-mix(in_srgb,var(--color-text-secondary)_18%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--color-text-secondary)_26%,transparent)] text-[var(--color-text-primary)]"
+                onClick={() => {
+                  setShowAllTop(s => !s);
+                  console.log('Dashboard: toggle top list', { contentTypeFilter, nextShowAllTop: !showAllTop, top5Count: top5.length, top10Count: top10.length });
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setShowAllTop(s => !s);
+                    console.log('Dashboard: toggle top list (keyboard)', { contentTypeFilter, nextShowAllTop: !showAllTop });
+                  }
+                }}
+                className="relative px-3 py-1 rounded-lg font-semibold text-sm transition-colors duration-200 bg-[color:color-mix(in_srgb,var(--color-text-secondary)_18%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--color-text-secondary)_26%,transparent)] text-[var(--color-text-primary)]"
+                style={{ zIndex: 1, pointerEvents: 'auto', cursor: 'pointer' }}
+                aria-pressed={showAllTop}
+                aria-label={showAllTop ? 'Show less top items' : 'Show more top items'}
+                role="button"
+                tabIndex={0}
               >
                 {showAllTop ? "Show Less" : "Show More"}
               </button>
@@ -201,14 +217,14 @@ function Dashboard() {
 // --- Reusable Sub-components ---
 
 const ContentTypeSelector = ({ contentTypeFilter, setContentTypeFilter, theme }) => (
-  <div className="flex justify-center border-b border-gray-700 mb-6 sticky top-0 bg-[var(--color-background-primary)] z-10 py-2">
+  <div className="flex justify-center flex-wrap gap-4 border-b border-gray-700 mb-6 sticky top-0 bg-[var(--color-background-primary)] z-10 py-2 px-2">
     <TabButton title="Movies" isActive={contentTypeFilter === 'movie'} onClick={() => setContentTypeFilter('movie')} theme={theme.movie} />
     <TabButton title="TV Series" isActive={contentTypeFilter === 'tv'} onClick={() => setContentTypeFilter('tv')} theme={theme.tv} />
   </div>
 );
 
 const TabButton = ({ title, isActive, onClick, theme }) => (
-  <button onClick={onClick} className={`px-4 py-2 text-lg font-semibold transition-colors duration-300 ${isActive ? `text-[var(--color-text-primary)] dark:${theme.mainText} border-b-2 border-[var(--color-text-primary)] dark:${theme.border}` : "text-[var(--color-text-primary)] dark:text-gray-400 border-b-2 border-transparent hover:text-[var(--color-text-primary)]"}`}>
+  <button onClick={onClick} className={`px-3 sm:px-4 py-2 text-sm sm:text-lg font-semibold transition-colors duration-300 ${isActive ? `text-[var(--color-text-primary)] dark:${theme.mainText} border-b-2 border-[var(--color-text-primary)] dark:${theme.border}` : "text-[var(--color-text-primary)] dark:text-gray-400 border-b-2 border-transparent hover:text-[var(--color-text-primary)]"}`}>
   {title}
   </button>
 );

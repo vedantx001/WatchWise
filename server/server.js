@@ -8,6 +8,7 @@ const userRoutes = require("./routes/userRoutes.js");
 const movieRoutes = require("./routes/movieRoutes.js");
 const statsRoutes = require("./routes/stats.js");
 const chatRoutes = require("./routes/chatRoutes.js");
+const trailerRoutes = require("./routes/trailerRoutes.js");
 
 dotenv.config();
 const app = express();
@@ -19,6 +20,7 @@ app.use("/api/user", userRoutes);
 app.use("/api/movies", movieRoutes);
 app.use("/api", statsRoutes);
 app.use("/api/chat", chatRoutes);
+app.use("/api/trailer", trailerRoutes);
 
 mongoose.connect(process.env.MONGO_URL)
   .then(() => console.log("MongoDB Connected"))

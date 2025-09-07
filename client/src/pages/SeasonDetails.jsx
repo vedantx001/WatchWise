@@ -86,6 +86,13 @@ export default function SeasonDetails() {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [expanded, setExpanded] = useState(null);
   const [watchedCount, setWatchedCount] = useState(0);
+  const [toast, setToast] = useState(null); // { type: 'success' | 'error', message: string }
+
+  const showToast = (message, type = 'success', duration = 2800) => {
+    setToast({ message, type });
+    window.clearTimeout(showToast._t);
+    showToast._t = window.setTimeout(() => setToast(null), duration);
+  };
   useEffect(() => {
     let mounted = true;
 
@@ -187,13 +194,13 @@ export default function SeasonDetails() {
       };
       const res = await api.post("/movies", payload, withAuth);
       setWatchDoc(res.data); // backend returns the whole show doc
-      alert(`Season ${seasonNumber} added to watchlist!`);
+  showToast(`Season ${seasonNumber} added to watchlist`, 'success');
     } catch (e) {
       const msg =
         e?.response?.data?.msg ||
         e?.response?.data?.errors?.[0]?.msg ||
         e.message;
-      alert(`Failed to add: ${msg}`);
+  showToast(`Failed to add season: ${msg}`, 'error');
     } finally {
       setAdding(false);
     }
@@ -232,7 +239,7 @@ export default function SeasonDetails() {
         e?.response?.data?.msg ||
         e?.response?.data?.errors?.[0]?.msg ||
         e.message;
-      alert(`Failed to update: ${msg}`);
+  showToast(`Failed to update: ${msg}`, 'error');
     } finally {
       setUpdatingStatus(false);
     }
@@ -297,6 +304,13 @@ export default function SeasonDetails() {
               </div>
 
               <div className="mt-auto pt-6 flex flex-wrap gap-3">
+                <button
+                  onClick={() => navigate(`/trailer/tv/${id}/season/${seasonNumber}`)}
+                  className="bg-white/20 text-white font-bold px-6 py-3 rounded-lg shadow-lg hover:bg-white/30 transition cursor-pointer"
+                  title="Play trailer"
+                >
+                  ▶ Play Trailer
+                </button>
                 {!thisSeasonInDoc ? (
                   <button
                     onClick={addSeasonToWatchlist}
@@ -488,6 +502,13 @@ export default function SeasonDetails() {
             <div className="text-xl opacity-90 mt-1">Season {seasonNumber}</div>
 
             <div className="mt-3 flex items-center gap-3">
+              <button
+                onClick={() => navigate(`/trailer/tv/${id}/season/${seasonNumber}`)}
+                className="w-10 h-10 rounded-full flex items-center justify-center bg-white/10 text-white cursor-pointer"
+                title="Play trailer"
+              >
+                ▶
+              </button>
               {!thisSeasonInDoc ? (
                 <button
                   onClick={addSeasonToWatchlist}
@@ -681,6 +702,15 @@ export default function SeasonDetails() {
       {Desktop}
       {Mobile}
   {StickyCTA}
+      {/* Toast Notification */}
+      {toast && (
+        <div className="toast-container">
+          <div className={`toast ${toast.type}`} role="status" aria-live="polite">
+            <span className="toast-dot" aria-hidden="true" />
+            <span className="toast-message">{toast.message}</span>
+          </div>
+        </div>
+      )}
     </>
   );
 }
