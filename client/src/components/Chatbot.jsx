@@ -3,6 +3,8 @@ import axios from "axios";
 import ReactMarkdown from "react-markdown";
 import "../styles/chatbot.css";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+
 // Enhanced SVG Icons
 const UserIcon = () => (
   <svg
@@ -153,7 +155,7 @@ export default function Chatbot({ visible, onClose }) {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.post(
-        "http://localhost:5000/api/chat",
+        `${API_BASE_URL}/chat`,
         {
           message: messageText, 
         },
